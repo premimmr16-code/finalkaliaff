@@ -2950,3 +2950,64 @@ setTimeout(loadV6Tracking,1800);
 
 </body>
 </html>
+
+<!-- ===== LIVE CHAT PROFILE FIX PATCH (keeps full code, no line removed) ===== -->
+<script>
+(function(){
+  function cleanPhone(v){ return String(v || '').replace(/[^0-9+]/g, '').trim(); }
+
+  window.saveProfile = function() {
+    const nameEl = document.getElementById('profileName');
+    const phoneEl = document.getElementById('profilePhone');
+    const bg = document.getElementById('profileModalBg');
+    const name = (nameEl?.value || '').trim();
+    const phone = cleanPhone(phoneEl?.value || '');
+
+    if(!name) { showToast('নাম লিখুন!'); return; }
+    if(!phone || phone.replace(/[^0-9]/g,'').length < 10) { showToast('সঠিক মোবাইল নম্বর দিন!'); return; }
+
+    const oldProfile = (function(){ try { return JSON.parse(localStorage.getItem('kaliaff_profile') || '{}') || {}; } catch(e){ return {}; } })();
+    const profile = { ...oldProfile, name, phone, email: oldProfile.email || '' };
+    localStorage.setItem('kaliaff_profile', JSON.stringify(profile));
+
+    if(bg) bg.classList.remove('open');
+
+    const statusEl = document.getElementById('chatStatus');
+    if(statusEl) statusEl.textContent = '● অনলাইন | ' + name;
+
+    const win = document.getElementById('chatWindow');
+    if(win) win.classList.add('open');
+
+    if(window._pendingProfileAction) {
+      const action = window._pendingProfileAction;
+      window._pendingProfileAction = null;
+      try { action(); } catch(e) { console.error('pending profile action failed', e); }
+    }
+
+    showToast('✅ প্রোফাইল সেভ হয়েছে!', 'success');
+  };
+
+  window.requireProfile = function(msg, callback) {
+    let profile = null;
+    try { profile = JSON.parse(localStorage.getItem('kaliaff_profile') || 'null'); } catch(e) { profile = null; }
+
+    if(profile && profile.name && profile.phone) {
+      if(typeof callback === 'function') callback();
+      return;
+    }
+
+    const modalMsg = document.getElementById('profileModalMsg');
+    const bg = document.getElementById('profileModalBg');
+    const nameEl = document.getElementById('profileName');
+    const phoneEl = document.getElementById('profilePhone');
+
+    if(modalMsg) modalMsg.textContent = msg || 'চালিয়ে যেতে নাম ও মোবাইল নম্বর দিন।';
+    if(nameEl && profile?.name) nameEl.value = profile.name;
+    if(phoneEl && profile?.phone) phoneEl.value = profile.phone;
+    if(bg) bg.classList.add('open');
+
+    window._pendingProfileAction = (typeof callback === 'function') ? callback : null;
+    setTimeout(function(){ if(nameEl && !nameEl.value) nameEl.focus(); }, 80);
+  };
+})();
+</script>
