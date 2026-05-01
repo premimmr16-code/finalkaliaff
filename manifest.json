@@ -1,0 +1,17 @@
+{
+  "name": "Kalia Fastfood",
+  "short_name": "Kalia",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#fff8f0",
+  "theme_color": "#c0392b",
+  "description": "Kalia Fastfood Satpar Bazar, Gopalganj",
+  "icons": [
+    {
+      "src": "kaliaff.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ]
+}
