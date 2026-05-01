@@ -955,7 +955,7 @@ nav{height:auto;min-height:60px;}
 .whatsapp-buy-bar-btn{position:relative;display:flex!important;align-items:center;justify-content:center;gap:7px;min-width:128px;box-shadow:0 8px 22px rgba(37,211,102,.28);}
 .whatsapp-buy-bar-btn:before{content:'💬';width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:rgba(255,255,255,.22);font-size:.95rem;flex-shrink:0;}
 .floating-wa-product{position:fixed;right:max(18px,env(safe-area-inset-right));bottom:calc(142px + env(safe-area-inset-bottom));z-index:3002;width:54px;height:54px;border-radius:50%;background:#25D366;color:white;border:3px solid white;box-shadow:0 12px 30px rgba(37,211,102,.45);display:none;align-items:center;justify-content:center;font-size:1.45rem;text-decoration:none;}
-.modal-overlay.open .floating-wa-product{display:flex;}
+.modal-overlay.open .floating-wa-product{display:none!important;}
 @media(max-width:520px){.variants{grid-template-columns:1fr}.food-detail-bottom-bar{left:0!important;right:0!important;margin:0;border-radius:16px 16px 0 0}.whatsapp-buy-bar-btn{min-width:0;font-size:.75rem}.floating-wa-product{right:16px;bottom:calc(156px + env(safe-area-inset-bottom));width:50px;height:50px}.variant-btn{min-height:48px;padding:9px}}
 body.dark-mode .variant-btn{background:#2c1810;color:#f5e7dc;border-color:#4b2b1d;}
 body.dark-mode .variant-btn.active{background:linear-gradient(135deg,var(--primary),#62180f);border-color:var(--gold);}
@@ -1338,6 +1338,7 @@ body.dark-mode .variant-btn.active{background:linear-gradient(135deg,var(--prima
         <label class="form-label">🎟️ কুপন কোড</label>
         <div style="display:flex;gap:8px;"><input class="form-input" id="couponInput" placeholder="SAVE10 / FREEDEL"><button class="place-order-btn" style="width:auto;padding:10px 14px;margin:0;background:var(--gold);color:var(--dark);" onclick="applyCoupon()" type="button">Apply</button></div>
         <div id="couponMsg" style="font-size:0.76rem;color:var(--text-light);margin-top:5px;">Percentage discount / free delivery coupon</div>
+        <div id="deliveryAreaNoticeBox" style="display:none;margin-top:10px;background:#fff3cd;border:1px solid #ffc107;color:#856404;border-radius:10px;padding:10px;font-size:0.82rem;line-height:1.5;"></div>
       </div>
       <div style="background:var(--light);border-radius:9px;padding:11px;margin-bottom:14px;">
         <div class="cart-total-row"><span class="cart-total-label">সাবটোটাল</span><span id="chkSubtotal">৳০</span></div>
@@ -1521,7 +1522,7 @@ body.dark-mode .variant-btn.active{background:linear-gradient(135deg,var(--prima
 <!-- FIREBASE SDK -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, doc, getDoc, query, where, orderBy, serverTimestamp, onSnapshot, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, doc, getDoc, setDoc, query, where, orderBy, serverTimestamp, onSnapshot, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getStorage, ref, uploadString, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
 const firebaseConfig = {
@@ -1540,7 +1541,7 @@ const storage = getStorage(app);
 
 window._db = db; window._storage = storage;
 window._addDoc = addDoc; window._getDocs = getDocs;
-window._doc = doc; window._getDoc = getDoc;
+window._doc = doc; window._getDoc = getDoc; window._setDoc = setDoc;
 window._collection = collection; window._query = query;
 window._where = where; window._orderBy = orderBy;
 window._serverTimestamp = serverTimestamp;
@@ -1692,10 +1693,16 @@ async function loadHomeHistory() {
 // ===== SETTINGS =====
 async function loadSettings() {
   try {
+    settings = {};
+    const mainSnap = await _getDoc(_doc(_db, 'settings', 'main'));
+    if(mainSnap.exists()) settings = {...mainSnap.data(), id:'main'};
     const snap = await _getDocs(_collection(_db, 'settings'));
-    snap.forEach(d => { settings = {...settings, ...d.data(), id: d.id}; });
-    applySettings();
-  } catch(e) {}
+    snap.forEach(d => { if(d.id !== 'main') settings = {...settings, ...d.data(), id: settings.id || d.id}; });
+  } catch(e) {
+    try { settings = JSON.parse(localStorage.getItem('kaliaff_settings_backup') || '{}'); } catch(_) { settings = {}; }
+  }
+  try { const local = JSON.parse(localStorage.getItem('kaliaff_settings_backup') || '{}'); settings = {...local, ...settings}; } catch(_) {}
+  applySettings();
 }
 
 function applySettings() {
@@ -1706,13 +1713,14 @@ function applySettings() {
   }
   if(settings.logoUrl){ const im=document.getElementById('navLogoImg'); const fb=document.getElementById('navLogoFallback'); if(im){ im.style.display='block'; im.src=settings.logoUrl; } if(fb) fb.style.display='none'; }
   if(settings.seoDescription){ let md=document.querySelector('meta[name=\"description\"]'); if(!md){ md=document.createElement('meta'); md.name='description'; document.head.appendChild(md); } md.content=settings.seoDescription; }
+  if(settings.seoKeywords){ let mk=document.querySelector('meta[name=\"keywords\"]'); if(!mk){ mk=document.createElement('meta'); mk.name='keywords'; document.head.appendChild(mk); } mk.content=settings.seoKeywords; }
   if(settings.phone) document.getElementById('footerPhone').textContent = '📞 ' + settings.phone;
   if(settings.address) {
     document.getElementById('footerAddress').textContent = '📍 ' + settings.address;
   }
   if(settings.deliveryBase) {
     const extra = parseInt(settings.deliveryExtraCharge || 20);
-    document.getElementById('deliveryInfo').textContent = `ডেলিভারি চার্জ: আপনার ভাড়া + ৳${extra} সার্ভিস চার্জ`;
+    document.getElementById('deliveryInfo').textContent = settings.deliveryAreaNotice || `ডেলিভারি চার্জ: আপনার ভাড়া + ৳${extra} সার্ভিস চার্জ`;
   }
   if(settings.bkash) {
     document.getElementById('bkashNum').textContent = settings.bkash;
@@ -1919,6 +1927,7 @@ function scoreFood(f, q){
   const name = normSearchText(f.name);
   const desc = normSearchText(f.description);
   const cat = normSearchText(f.category);
+  const tags = normSearchText(Array.isArray(f.searchTags)?f.searchTags.join(' '):(f.searchTags||''));
   let score = (parseInt(f.buyCount)||0)*8 + (parseInt(f.searchCount)||0)*4;
   if(!query) return score;
   if(name === query) score += 1000;
@@ -1926,14 +1935,15 @@ function scoreFood(f, q){
   if(name.includes(query)) score += 250;
   if(cat.includes(query)) score += 120;
   if(desc.includes(query)) score += 80;
-  query.split(/\s+/).filter(Boolean).forEach(w=>{ if(name.includes(w)) score+=60; if(desc.includes(w)) score+=20; if(cat.includes(w)) score+=30; });
+  if(tags.includes(query)) score += 180;
+  query.split(/\s+/).filter(Boolean).forEach(w=>{ if(name.includes(w)) score+=60; if(desc.includes(w)) score+=20; if(cat.includes(w)) score+=30; if(tags.includes(w)) score+=55; });
   return score;
 }
 function popularSort(a,b){ return ((parseInt(b.buyCount)||0)*8+(parseInt(b.searchCount)||0)*4) - ((parseInt(a.buyCount)||0)*8+(parseInt(a.searchCount)||0)*4); }
 function getSearchMatches(q){
   const query=normSearchText(q);
   let list=[...allFoods];
-  if(query) list=list.filter(f=> normSearchText([f.name,f.description,f.category,f.tag].join(' ')).includes(query) || query.split(/\s+/).some(w=>normSearchText([f.name,f.description,f.category].join(' ')).includes(w)) );
+  if(query) list=list.filter(f=> normSearchText([f.name,f.description,f.category,f.tag,Array.isArray(f.searchTags)?f.searchTags.join(' '):(f.searchTags||'')].join(' ')).includes(query) || query.split(/\s+/).some(w=>normSearchText([f.name,f.description,f.category,Array.isArray(f.searchTags)?f.searchTags.join(' '):(f.searchTags||'')].join(' ')).includes(w)) );
   return list.sort((a,b)=>scoreFood(b,query)-scoreFood(a,query));
 }
 async function bumpFoodMetric(foodId, field){
@@ -2133,6 +2143,8 @@ window.openFoodModal = function(id) {
   }
   
   document.getElementById('foodModalOverlay').classList.add('open');
+  document.body.classList.add('product-detail-open');
+  const chatBtn=document.querySelector('.live-chat-btn'); const chatWin=document.getElementById('chatWindow'); if(chatBtn) chatBtn.style.display='none'; if(chatWin) chatWin.classList.remove('open');
   document.body.style.overflow = 'hidden';
   if(slideImages.length > 1) {
     productSlideTimer = setInterval(() => slideImg(1), 3000);
@@ -2168,6 +2180,8 @@ window.selectVariantByIndex = function(i){
 window.closeFoodModal = function() {
   if(productSlideTimer) { clearInterval(productSlideTimer); productSlideTimer = null; }
   document.getElementById('foodModalOverlay').classList.remove('open');
+  document.body.classList.remove('product-detail-open');
+  const chatBtn=document.querySelector('.live-chat-btn'); if(chatBtn) chatBtn.style.display='flex';
   document.body.style.overflow = '';
 }
 window.changeModalQty = function(d) {
@@ -2248,6 +2262,7 @@ function updateCartUI() {
   const dr=document.getElementById('chkDiscountRow'), dv=document.getElementById('chkDiscount');
   if(dr&&dv){dr.style.display=couponDiscount>0?'flex':'none';dv.textContent='-৳'+couponDiscount;}
   const chkTotalEl=document.getElementById('chkTotal'); if(chkTotalEl) chkTotalEl.textContent = '৳' + finalTotal;
+  const dn=document.getElementById('deliveryAreaNoticeBox'); if(dn){ const txt=settings.deliveryAreaNotice||''; dn.style.display=txt?'block':'none'; dn.textContent=txt; }
   renderCartItems();
 }
 function getDeliveryCharge(subtotal) {
