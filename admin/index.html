@@ -1971,5 +1971,96 @@ setTimeout(()=>{try{syncCategoryDatalist();}catch(e){}},1500);
 })();
 </script>
 
+
+<!-- ===== AUTO MENU SEED PATCH: names + prices + variants + 3/4 images ===== -->
+<script id="kaliaffMenuSeedPatch">
+(function(){
+  function ready(fn){ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',fn); else fn(); }
+  function toast(msg,type){ if(typeof showToast==='function') showToast(msg,type||''); else alert(msg); }
+  const imgs={
+    sandwich:['https://images.unsplash.com/photo-1528735602780-2552fd46c7af?auto=format&fit=crop&w=900&q=80','https://images.unsplash.com/photo-1553909489-cd47e0907980?auto=format&fit=crop&w=900&q=80','https://images.unsplash.com/photo-1481070555726-e2fe8357725c?auto=format&fit=crop&w=900&q=80','https://images.unsplash.com/photo-1619096252214-ef06c45683e3?auto=format&fit=crop&w=900&q=80'],
+    shawarma:['https://images.pexels.com/photos/461198/pexels-photo-461198.jpeg?auto=compress&cs=tinysrgb&w=900','https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?auto=format&fit=crop&w=900&q=80','https://images.unsplash.com/photo-1613564834361-9436948817d1?auto=format&fit=crop&w=900&q=80','https://images.unsplash.com/photo-1626700051175-6818013e1d4f?auto=format&fit=crop&w=900&q=80'],
+    momo:['https://images.unsplash.com/photo-1496116218417-1a781b1c416c?auto=format&fit=crop&w=900&q=80','https://images.unsplash.com/photo-1563245372-f21724e3856d?auto=format&fit=crop&w=900&q=80','https://images.unsplash.com/photo-1585032226651-759b368d7246?auto=format&fit=crop&w=900&q=80','https://images.pexels.com/photos/955137/pexels-photo-955137.jpeg?auto=compress&cs=tinysrgb&w=900'],
+    meatbox:['https://images.unsplash.com/photo-1543352634-a1c51d9f1fa7?auto=format&fit=crop&w=900&q=80','https://images.unsplash.com/photo-1604909052743-94e838986d24?auto=format&fit=crop&w=900&q=80','https://images.unsplash.com/photo-1512058564366-18510be2db19?auto=format&fit=crop&w=900&q=80','https://images.pexels.com/photos/461198/pexels-photo-461198.jpeg?auto=compress&cs=tinysrgb&w=900'],
+    pasta:['https://images.unsplash.com/photo-1551183053-bf91a1d81141?auto=format&fit=crop&w=900&q=80','https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?auto=format&fit=crop&w=900&q=80','https://images.unsplash.com/photo-1603133872878-684f208fb84b?auto=format&fit=crop&w=900&q=80','https://images.pexels.com/photos/1279330/pexels-photo-1279330.jpeg?auto=compress&cs=tinysrgb&w=900'],
+    chowmein:['https://images.pexels.com/photos/1279330/pexels-photo-1279330.jpeg?auto=compress&cs=tinysrgb&w=900','https://images.pexels.com/photos/2347311/pexels-photo-2347311.jpeg?auto=compress&cs=tinysrgb&w=900','https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=900&q=80','https://images.unsplash.com/photo-1585032226651-759b368d7246?auto=format&fit=crop&w=900&q=80'],
+    snacks:['https://images.unsplash.com/photo-1562967916-eb82221dfb92?auto=format&fit=crop&w=900&q=80','https://images.pexels.com/photos/1583884/pexels-photo-1583884.jpeg?auto=compress&cs=tinysrgb&w=900','https://images.pexels.com/photos/1893555/pexels-photo-1893555.jpeg?auto=compress&cs=tinysrgb&w=900','https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?auto=format&fit=crop&w=900&q=80'],
+    soup:['https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=900&q=80','https://images.unsplash.com/photo-1603105037880-880cd4edfb0d?auto=format&fit=crop&w=900&q=80','https://images.unsplash.com/photo-1476718406336-bb5a9690ee2a?auto=format&fit=crop&w=900&q=80','https://images.pexels.com/photos/539451/pexels-photo-539451.jpeg?auto=compress&cs=tinysrgb&w=900'],
+    fuchka:['https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=900&q=80','https://images.unsplash.com/photo-1606491956689-2ea866880c84?auto=format&fit=crop&w=900&q=80','https://images.unsplash.com/photo-1626132647523-66f5bf380027?auto=format&fit=crop&w=900&q=80','https://images.pexels.com/photos/5410401/pexels-photo-5410401.jpeg?auto=compress&cs=tinysrgb&w=900'],
+    lassi:['https://images.pexels.com/photos/5946631/pexels-photo-5946631.jpeg?auto=compress&cs=tinysrgb&w=900','https://images.pexels.com/photos/5946632/pexels-photo-5946632.jpeg?auto=compress&cs=tinysrgb&w=900','https://images.pexels.com/photos/5946633/pexels-photo-5946633.jpeg?auto=compress&cs=tinysrgb&w=900','https://images.unsplash.com/photo-1544145945-f90425340c7e?auto=format&fit=crop&w=900&q=80'],
+    shake:['https://images.unsplash.com/photo-1572490122747-3968b75cc699?auto=format&fit=crop&w=900&q=80','https://images.unsplash.com/photo-1577805947697-89e18249d767?auto=format&fit=crop&w=900&q=80','https://images.unsplash.com/photo-1563805042-7684c019e1cb?auto=format&fit=crop&w=900&q=80','https://images.pexels.com/photos/103566/pexels-photo-103566.jpeg?auto=compress&cs=tinysrgb&w=900'],
+    icecream:['https://images.unsplash.com/photo-1563805042-7684c019e1cb?auto=format&fit=crop&w=900&q=80','https://images.unsplash.com/photo-1501443762994-82bd5dace89a?auto=format&fit=crop&w=900&q=80','https://images.unsplash.com/photo-1488900128323-21503983a07e?auto=format&fit=crop&w=900&q=80','https://images.pexels.com/photos/1352278/pexels-photo-1352278.jpeg?auto=compress&cs=tinysrgb&w=900'],
+    faluda:['https://images.pexels.com/photos/3026804/pexels-photo-3026804.jpeg?auto=compress&cs=tinysrgb&w=900','https://images.pexels.com/photos/1400172/pexels-photo-1400172.jpeg?auto=compress&cs=tinysrgb&w=900','https://images.unsplash.com/photo-1551024506-0bccd828d307?auto=format&fit=crop&w=900&q=80','https://images.unsplash.com/photo-1563805042-7684c019e1cb?auto=format&fit=crop&w=900&q=80'],
+    juice:['https://images.unsplash.com/photo-1621506289937-a8e4df240d0b?auto=format&fit=crop&w=900&q=80','https://images.unsplash.com/photo-1600271886742-f049cd451bba?auto=format&fit=crop&w=900&q=80','https://images.unsplash.com/photo-1613478223719-2ab802602423?auto=format&fit=crop&w=900&q=80','https://images.pexels.com/photos/96974/pexels-photo-96974.jpeg?auto=compress&cs=tinysrgb&w=900'],
+    coffee:['https://images.pexels.com/photos/302899/pexels-photo-302899.jpeg?auto=compress&cs=tinysrgb&w=900','https://images.pexels.com/photos/374885/pexels-photo-374885.jpeg?auto=compress&cs=tinysrgb&w=900','https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=900&q=80','https://images.unsplash.com/photo-1517701604599-bb29b565090c?auto=format&fit=crop&w=900&q=80'],
+    burger:['https://images.unsplash.com/photo-1550547660-d9450f859349?auto=format&fit=crop&w=900&q=80','https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=900&q=80','https://images.pexels.com/photos/1639557/pexels-photo-1639557.jpeg?auto=compress&cs=tinysrgb&w=900','https://images.pexels.com/photos/2983101/pexels-photo-2983101.jpeg?auto=compress&cs=tinysrgb&w=900'],
+    pizza:['https://images.pexels.com/photos/825661/pexels-photo-825661.jpeg?auto=compress&cs=tinysrgb&w=900','https://images.pexels.com/photos/2619967/pexels-photo-2619967.jpeg?auto=compress&cs=tinysrgb&w=900','https://images.pexels.com/photos/2147491/pexels-photo-2147491.jpeg?auto=compress&cs=tinysrgb&w=900','https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=900&q=80'],
+    setmenu:['https://images.unsplash.com/photo-1543352634-a1c51d9f1fa7?auto=format&fit=crop&w=900&q=80','https://images.unsplash.com/photo-1512058564366-18510be2db19?auto=format&fit=crop&w=900&q=80','https://images.unsplash.com/photo-1604909052743-94e838986d24?auto=format&fit=crop&w=900&q=80','https://images.pexels.com/photos/461198/pexels-photo-461198.jpeg?auto=compress&cs=tinysrgb&w=900'],
+    biryani:['https://images.unsplash.com/photo-1563379091339-03246963d96c?auto=format&fit=crop&w=900&q=80','https://images.unsplash.com/photo-1589302168068-964664d93dc0?auto=format&fit=crop&w=900&q=80','https://images.unsplash.com/photo-1631515242808-497c3fbd3972?auto=format&fit=crop&w=900&q=80','https://images.pexels.com/photos/9609854/pexels-photo-9609854.jpeg?auto=compress&cs=tinysrgb&w=900'],
+    hotdog:['https://images.unsplash.com/photo-1619740455993-9e612b1af08a?auto=format&fit=crop&w=900&q=80','https://images.unsplash.com/photo-1551782450-a2132b4ba21d?auto=format&fit=crop&w=900&q=80','https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?auto=format&fit=crop&w=900&q=80','https://images.pexels.com/photos/4518647/pexels-photo-4518647.jpeg?auto=compress&cs=tinysrgb&w=900']
+  };
+  function imageList(key){ return (imgs[key]||imgs.snacks).slice(0,4); }
+  function item(name,category,price,key,variants,desc){ const images=imageList(key); return {name,category,price,image:images[0],images,variants:variants||[],description:desc||'',discount:0,tag:'',active:true,deleted:false,status:'active'}; }
+  const menu=[
+    item('সাব স্যান্ডউইচ','স্যান্ডউইচ',140,'sandwich'),item('স্পেশাল সাব স্যান্ডউইচ','স্যান্ডউইচ',210,'sandwich'),
+    item('চিকেন শর্মা','শর্মা',120,'shawarma'),item('স্পাইসি চিকেন শর্মা','শর্মা',150,'shawarma'),item('ভেজিটেবল শর্মা','শর্মা',140,'shawarma'),item('স্পেশাল শর্মা','শর্মা',170,'shawarma'),
+    item('স্টিম মোমো (৬ পিস)','মোমো',120,'momo'),item('চিজ স্টিম মোমো (৬ পিস)','মোমো',150,'momo'),item('ফ্রাই মোমো (৬ পিস)','মোমো',150,'momo'),item('ফ্রাই চিজ মোমো (৬ পিস)','মোমো',180,'momo'),item('কে এফ সি স্পেশাল মোমো (৬ পিস)','মোমো',199,'momo'),item('কে এফ সি স্পেশাল ফ্রাই মোমো (৬ পিস)','মোমো',230,'momo'),
+    item('চিকেন মিট বক্স','মিট বক্স',180,'meatbox'),item('চিকেন চিজ মিট বক্স','মিট বক্স',220,'meatbox'),item('চিকেন চিজ ওভারলোডেড','মিট বক্স',250,'meatbox'),item('কে এফ সি স্পেশাল মিট বক্স','মিট বক্স',299,'meatbox'),
+    item('রেড সস পাস্তা','পাস্তা',120,'pasta'),item('হোয়াইট সস পাস্তা','পাস্তা',150,'pasta'),item('বার-বি-কিউ পাস্তা','পাস্তা',150,'pasta'),item('নাগা পাস্তা','পাস্তা',170,'pasta'),item('মাশরুম পাস্তা','পাস্তা',190,'pasta'),item('ওভেন বেকড পাস্তা','পাস্তা',270,'pasta'),item('কে এফ সি স্পেশাল পাস্তা','পাস্তা',250,'pasta'),
+    item('চিকেন চাউমিন','চাউমিন',150,'chowmein'),item('এগ চাউমিন','চাউমিন',120,'chowmein'),item('ভেজিটেবল চাউমিন','চাউমিন',100,'chowmein'),item('মিক্সড চাউমিন','চাউমিন',170,'chowmein'),item('কোরিয়ান স্পাইসি চাউমিন','চাউমিন',220,'chowmein'),item('কে এফ সি স্পেশাল চাউমিন','চাউমিন',250,'chowmein'),
+    item('ক্রিস্পি চিকেন ফ্রাই','স্ন্যাকস',90,'snacks'),item('থাই চিকেন ফ্রাই','স্ন্যাকস',100,'snacks'),item('ফ্রেঞ্চ ফ্রাই','স্ন্যাকস',100,'snacks'),item('নাচোস','স্ন্যাকস',150,'snacks'),item('স্পেশাল নাচোস','স্ন্যাকস',200,'snacks'),item('ভেজিটেবল সালাদ','স্ন্যাকস',100,'snacks'),item('ক্যান্টন সালাদ','স্ন্যাকস',350,'snacks'),
+    item('কর্ন সুপ','সুপ',120,'soup'),item('থাই সুপ','সুপ',150,'soup'),item('থাই ক্লিয়ার সুপ','সুপ',150,'soup'),item('অনথন (৬ পিস)','সুপ',150,'soup'),
+    item('নাগা ফুচকা (৮ পিস)','ফুচকা',80,'fuchka'),item('দই ফুচকা (৮ পিস)','ফুচকা',150,'fuchka'),item('চিড়া দই','ফুচকা',100,'fuchka'),
+    item('সুইট লাচ্ছি','লাচ্ছি',120,'lassi'),item('স্ট্রবেরি লাচ্ছি','লাচ্ছি',120,'lassi'),item('ম্যাঙ্গো লাচ্ছি','লাচ্ছি',120,'lassi'),
+    item('চকোলেট মিল্কশেক','মিল্কশেক',120,'shake'),item('ম্যাঙ্গো মিল্কশেক','মিল্কশেক',120,'shake'),item('ক্যারামেল চকোলেট মিল্কশেক','মিল্কশেক',120,'shake'),item('ভ্যানিলা মিল্কশেক','মিল্কশেক',120,'shake'),item('স্ট্রবেরি মিল্কশেক','মিল্কশেক',120,'shake'),item('কিটক্যাট মিল্কশেক','মিল্কশেক',150,'shake'),
+    item('আইসক্রিম','আইসক্রিম',90,'icecream',[{name:'ভ্যানিলা',price:90},{name:'ম্যাঙ্গো',price:90},{name:'চকোলেট',price:90},{name:'স্ট্রবেরি',price:90}]),
+    item('ফালুদা','ফালুদা',150,'faluda',[{name:'ভ্যানিলা',price:150},{name:'ম্যাঙ্গো',price:150},{name:'চকোলেট',price:150},{name:'স্ট্রবেরি',price:150}]),item('কে এফ সি স্পেশাল ফালুদা','ফালুদা',199,'faluda'),
+    item('অরেঞ্জ জুস','জুস',100,'juice'),item('সিজনাল ফলের জুস','জুস',80,'juice'),
+    item('চকোলেট কোল্ড কফি','কোল্ড কফি',120,'coffee'),item('ক্যারামেল কোল্ড কফি','কোল্ড কফি',120,'coffee'),item('ক্যারামেল চকোলেট কোল্ড কফি','কোল্ড কফি',130,'coffee'),item('ব্ল্যাক কফি','হট কফি',50,'coffee'),item('মিল্ক হট কফি','হট কফি',70,'coffee'),item('চকোলেট হট কফি','হট কফি',100,'coffee'),item('ক্যারামেল হট কফি','হট কফি',90,'coffee'),
+    item('এগ বার্গার','বার্গার',100,'burger'),item('চিকেন ক্রিস্পি বার্গার','বার্গার',150,'burger'),item('কিং বার্গার','বার্গার',160,'burger'),item('গ্রিল সাব বার্গার','বার্গার',160,'burger'),item('চিকেন পেটি বার্গার','বার্গার',120,'burger'),item('বার-বি-কিউ বার্গার','বার্গার',170,'burger'),item('নাগা বার্গার','বার্গার',180,'burger'),item('মাশরুম বার্গার','বার্গার',199,'burger'),item('ডাবল চিজ বার্গার','বার্গার',220,'burger'),item('স্পেশাল বার্গার','বার্গার',250,'burger'),
+    item('চিকেন পিজ্জা','পিজ্জা',350,'pizza',[{name:'৬ inch',price:350},{name:'৮ inch',price:550},{name:'১০ inch',price:700},{name:'১২ inch',price:999}]),item('চিকেন বার-বি-কিউ পিজ্জা','পিজ্জা',400,'pizza',[{name:'৬ inch',price:400},{name:'৮ inch',price:600},{name:'১০ inch',price:750},{name:'১২ inch',price:1100}]),item('চিকেন ওভারলোডেড পিজ্জা','পিজ্জা',450,'pizza',[{name:'৬ inch',price:450},{name:'৮ inch',price:700},{name:'১০ inch',price:850},{name:'১২ inch',price:1200}]),item('কালিয়া ফাস্ট ফুড স্পেশাল পিজ্জা','পিজ্জা',500,'pizza',[{name:'৬ inch',price:500},{name:'৮ inch',price:800},{name:'১০ inch',price:900},{name:'১২ inch',price:1300}]),
+    item('সেট মেনু ১','সেট মেনু',230,'setmenu',[], 'চিকেন ফ্রাই + রাইস + চাইনিজ ভেজিটেবল + সালাদ'),item('সেট মেনু ২','সেট মেনু',260,'setmenu',[], 'চিলি চিকেন + রাইস + চাইনিজ ভেজিটেবল + সালাদ'),item('সেট মেনু ৩','সেট মেনু',280,'setmenu',[], 'বার-বি-কিউ চিকেন + রাইস + চাইনিজ ভেজিটেবল + সালাদ'),item('সেট মেনু ৪','সেট মেনু',290,'setmenu',[], 'মাসালা চিকেন + রাইস + চাইনিজ ভেজিটেবল + সালাদ'),item('সেট মেনু ৫','সেট মেনু',350,'setmenu',[], 'চিকেন ফ্রাই + বার-বি-কিউ চিকেন + রাইস + চাইনিজ ভেজিটেবল + সালাদ'),
+    item('হায়দ্রাবাদি চিকেন বিরিয়ানি','অন্যান্য',199,'biryani',[], 'মিনিমাম ২ প্লেট অর্ডার করতে হবে'),item('ফুল চিকেন ফ্রাই (১ কেজি)','অন্যান্য',600,'snacks'),item('হট ডগ (চিকেন)','অন্যান্য',150,'hotdog')
+  ];
+  window.kaliaffSeedFullMenu=async function(){
+    if(!window._db || !window._col || !window._addDoc){ toast('Firebase ready হয়নি, একটু পরে চেষ্টা করুন','error'); return; }
+    if(!confirm('মেনুর সব item auto add করবেন? Duplicate এড়াতে আগে একই নাম থাকলে skip হবে।')) return;
+    try{
+      const snap=await _getDocs(_col(_db,'foods')); const existing=new Set(); snap.forEach(d=>existing.add(String(d.data().name||'').trim()));
+      let added=0, skipped=0;
+      for(const m of menu){ if(existing.has(m.name)){ skipped++; continue; } await _addDoc(_col(_db,'foods'), Object.assign({},m,{createdAt:_serverTimestamp(),updatedAt:_serverTimestamp()})); added++; }
+      toast('✅ '+added+' item add হয়েছে, '+skipped+' duplicate skip হয়েছে','success');
+      if(typeof loadFoods==='function') await loadFoods(); if(typeof updateDashboard==='function') updateDashboard();
+    }catch(e){ console.error(e); toast('❌ Auto add সমস্যা: '+(e.message||e.code||'Firebase error'),'error'); }
+  };
+
+  function menuMapByName(){ const map=new Map(); menu.forEach(m=>map.set(String(m.name||'').trim(),m)); return map; }
+  async function refreshAfterMenuPatch(){ if(typeof loadFoods==='function') await loadFoods(); if(typeof updateDashboard==='function') updateDashboard(); }
+  window.kaliaffUpdateFullMenuImagesVariants=async function(){
+    if(!window._db || !window._col || !window._updateDoc){ toast('Firebase ready হয়নি, একটু পরে চেষ্টা করুন','error'); return; }
+    if(!confirm('Already added item-গুলোর online image + variant + price update করবেন?')) return;
+    try{
+      const map=menuMapByName(); const snap=await _getDocs(_col(_db,'foods'));
+      let updated=0, skipped=0;
+      for(const d of snap.docs){
+        const data=d.data(); const m=map.get(String(data.name||'').trim());
+        if(!m){ skipped++; continue; }
+        await _updateDoc(_doc(_db,'foods',d.id), {category:m.category, price:m.price, image:m.image, images:m.images, variants:m.variants||[], description:m.description||data.description||'', active:true, deleted:false, status:'active', updatedAt:_serverTimestamp()});
+        updated++;
+      }
+      toast('✅ '+updated+' item image/variant update হয়েছে'+(skipped?', '+skipped+' skip':''),'success');
+      await refreshAfterMenuPatch();
+    }catch(e){ console.error(e); toast('❌ Update সমস্যা: '+(e.message||e.code||'Firebase error'),'error'); }
+  };
+
+  ready(function(){
+    setTimeout(function(){
+      const head=document.querySelector('#secFoods .table-head'); if(!head) return;
+      if(!document.getElementById('seedFullMenuBtn')){ const btn=document.createElement('button'); btn.id='seedFullMenuBtn'; btn.className='btn btn-success'; btn.textContent='🍽️ Full Menu Auto Add'; btn.onclick=window.kaliaffSeedFullMenu; head.appendChild(btn); }
+      if(!document.getElementById('updateFullMenuImagesBtn')){ const btn2=document.createElement('button'); btn2.id='updateFullMenuImagesBtn'; btn2.className='btn btn-warning'; btn2.textContent='🖼️ Update Images/Variants'; btn2.onclick=window.kaliaffUpdateFullMenuImagesVariants; head.appendChild(btn2); }
+    },1200);
+  });
+})();
+</script>
 </body>
 </html>
