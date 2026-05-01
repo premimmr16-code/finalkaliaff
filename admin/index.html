@@ -552,6 +552,11 @@ select.form-input { appearance:auto; }
             <input class="form-input" id="sDeliveryExtraCharge" placeholder="20" type="number" min="0">
             <div style="font-size:0.78rem;color:var(--text-light);margin-top:4px;">উদাহরণ: User ৫০ টাকা ভাড়া দিলে → ডেলিভারি চার্জ = ৫০ + এখানে যা দেবেন</div>
           </div>
+          <div class="form-group" style="grid-column:1/-1;">
+            <label class="form-label">🚚 Delivery Area Notice (Checkout এ দেখাবে)</label>
+            <textarea class="form-input" id="sDeliveryAreaNotice" rows="3" placeholder="যেমন: আপাতত কালীগঞ্জ বাজার, আশেপাশের ৩ কিমি এলাকা ও নির্দিষ্ট জায়গায় ডেলিভারি দেওয়া হবে।"></textarea>
+            <div style="font-size:0.78rem;color:var(--text-light);margin-top:4px;">Online order করার সময় user এই নোটিশ দেখবে।</div>
+          </div>
         </div>
       </div>
 
@@ -638,7 +643,7 @@ service cloud.firestore {
   match /databases/{database}/documents {
     match /{document=**} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if true; // Password-only single-file admin panel এর জন্য
     }
   }
 }</pre>
@@ -649,7 +654,7 @@ service firebase.storage {
   match /b/{bucket}/o {
     match /{allPaths=**} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if true; // Password-only single-file admin panel এর জন্য
     }
   }
 }</pre>
@@ -700,6 +705,11 @@ service firebase.storage {
       <div class="form-group"><label class="form-label">স্ট্যাটাস</label>
         <select class="form-input" id="fActive"><option value="true">সক্রিয়</option><option value="false">নিষ্ক্রিয়</option></select>
       </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">🔎 Website Search Tags / Keywords</label>
+      <input class="form-input" id="fSearchTags" placeholder="burger, chicken, spicy, কালিয়া, ফাস্ট ফুড">
+      <div class="v6-mini-note">User search দিলে এগুলোর মাধ্যমে product সহজে পাওয়া যাবে। কমা দিয়ে একাধিক tag দিন।</div>
     </div>
     <div class="form-group">
       <label class="form-label">ভেরিয়েন্ট (সাইজ/পরিমাণ)</label>
@@ -897,11 +907,16 @@ async function initAdmin() {
 // ===== SETTINGS =====
 async function loadSettings() {
   try {
-    const snap = await _getDocs(_col(_db,'settings'));
     settings = {};
-    snap.forEach(d => { settings = {...settings, ...d.data(), _id:d.id}; });
-    fillSettings();
-  } catch(e){}
+    const mainSnap = await _getDoc(_doc(_db,'settings','main'));
+    if(mainSnap.exists()) settings = {...mainSnap.data(), _id:'main'};
+    const snap = await _getDocs(_col(_db,'settings'));
+    snap.forEach(d => { if(d.id !== 'main') settings = {...settings, ...d.data(), _id: settings._id || d.id}; });
+  } catch(e) {
+    try { settings = JSON.parse(localStorage.getItem('kaliaff_settings_backup') || '{}'); } catch(_) { settings = {}; }
+  }
+  try { const local = JSON.parse(localStorage.getItem('kaliaff_settings_backup') || '{}'); settings = {...local, ...settings}; } catch(_) {}
+  fillSettings();
 }
 
 function fillSettings() {
@@ -910,6 +925,7 @@ function fillSettings() {
   f('sBkash',settings.bkash); f('sNagad',settings.nagad);
   f('sDeliveryBase',settings.deliveryBase); f('sDeliveryPerKm',settings.deliveryPerKm);
   f('sDeliveryExtraCharge',settings.deliveryExtraCharge!==undefined?settings.deliveryExtraCharge:20);
+  f('sDeliveryAreaNotice',settings.deliveryAreaNotice);
   f('sFbLink',settings.fbLink); f('sWaNumber',settings.waNumber); f('sEmail',settings.email);
   f('sLocationLink',settings.locationLink);
   f('sLogoUrl',settings.logoUrl); f('sAppDownloadLink',settings.appDownloadLink);
@@ -936,6 +952,7 @@ window.saveSettings = async function() {
     bkash: v('sBkash'), nagad: v('sNagad'),
     deliveryBase: v('sDeliveryBase'), deliveryPerKm: v('sDeliveryPerKm'),
     deliveryExtraCharge: parseInt(v('sDeliveryExtraCharge'))||20,
+    deliveryAreaNotice: v('sDeliveryAreaNotice'),
     fbLink: v('sFbLink'), waNumber: v('sWaNumber'), email: v('sEmail'),
     adminAlertWhatsApp: v('sAdminAlertWhatsApp') || v('sWaNumber'), adminAlertEmail: v('sAdminAlertEmail') || v('sEmail'),
     autoAdminAlert: v('sAutoAdminAlert') !== 'false', autoCustomerStatus: v('sAutoCustomerStatus') !== 'false',
@@ -951,11 +968,18 @@ window.saveSettings = async function() {
     loyaltyEligibleMin: parseInt(v('sLoyaltyEligibleMin'))||150, loyaltyTargetAmount: parseInt(v('sLoyaltyTargetAmount'))||800, loyaltyMinOrders: parseInt(v('sLoyaltyMinOrders'))||3, loyaltyRewardPoints: parseInt(v('sLoyaltyRewardPoints'))||1000, loyaltyMaxPoints: parseInt(v('sLoyaltyMaxPoints'))||1000, referralBonusPoints: parseInt(v('sReferralBonusPoints'))||100, reviewBonusPoints: parseInt(v('sReviewBonusPoints'))||25, freeDeliveryMinOrder: parseInt(v('sFreeDeliveryMinOrder'))||0
   };
   try {
-    if(settings._id) { await _updateDoc(_doc(_db,'settings',settings._id), data); }
-    else { await _addDoc(_col(_db,'settings'), data); }
+    data.updatedAt = _serverTimestamp();
+    await _setDoc(_doc(_db,'settings','main'), data, {merge:true});
+    settings = {...settings, ...data, _id:'main'};
+    localStorage.setItem('kaliaff_settings_backup', JSON.stringify({...data, updatedAt:null, updatedAtLocal:new Date().toISOString()}));
     if(data.adminPassword) localStorage.setItem('kaliaff_admin_password', data.adminPassword);
+    if(data.imgbbKey) window._imgbbKey = data.imgbbKey;
     showToast('✅ সেটিংস সেভ হয়েছে!', 'success');
-  } catch(e) { showToast('❌ সেভ করতে সমস্যা হয়েছে'); }
+  } catch(e) {
+    localStorage.setItem('kaliaff_settings_backup', JSON.stringify({...data, updatedAt:null, updatedAtLocal:new Date().toISOString()}));
+    if(data.adminPassword) localStorage.setItem('kaliaff_admin_password', data.adminPassword);
+    showToast('⚠️ Firebase rules/auth সমস্যা, তবে এই browser-এ backup save হয়েছে। Rules allow write করুন।','error');
+  }
 }
 
 // ===== ORDERS =====
@@ -1132,7 +1156,7 @@ window.openFoodModal = function(docId) {
   foodImgsBase64 = [];
   document.getElementById('fId').value = docId || '';
   document.getElementById('foodModalTitle').textContent = docId ? 'খাবার এডিট করুন' : 'নতুন খাবার যোগ করুন';
-  ['fName','fCategory','fDesc','fPrice','fDiscount','fTag','fImgUrl','fUrl1','fUrl2','fUrl3','fUrl4','fUrl5','fUrl6'].forEach(id=>document.getElementById(id).value='');
+  ['fName','fCategory','fDesc','fPrice','fDiscount','fTag','fImgUrl','fUrl1','fUrl2','fUrl3','fUrl4','fUrl5','fUrl6','fSearchTags'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
   document.getElementById('fActive').value='true';
   document.getElementById('fImgPreviewGrid').innerHTML='';
   document.getElementById('variantsList').innerHTML='';
@@ -1145,6 +1169,7 @@ window.editFood = function(docId) {
   setTimeout(()=>{
     sv('fName',f.name); sv('fCategory',f.category); sv('fDesc',f.description);
     sv('fPrice',f.price); sv('fDiscount',f.discount); sv('fTag',f.tag);
+    sv('fSearchTags', Array.isArray(f.searchTags)?f.searchTags.join(', '):(f.searchTags||''));
     sv('fImgUrl',f.image); sv('fActive',f.active!==false?'true':'false');
     (f.productUrls||f.urls||[]).slice(0,6).forEach((u,i)=>sv('fUrl'+(i+1),u));
     // Show existing images
@@ -1178,12 +1203,7 @@ window.saveFood = async function() {
   const saveBtn = document.querySelector('#foodModalBg .btn-primary');
   if(saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'সেভ হচ্ছে...'; }
 
-  // Auth check first
-  if(!_auth || !_auth.currentUser) {
-    showToast('❌ লগইন session শেষ! পেজ রিলোড করুন।', 'error');
-    if(saveBtn) { saveBtn.disabled=false; saveBtn.innerHTML='💾 সেভ করুন'; }
-    return;
-  }
+  // Password-only admin panel: Firestore Rules must allow write for this single-file version.
 
   let imgUrl = v('fImgUrl') || '';
   let allImgUrls = [];
@@ -1245,6 +1265,7 @@ window.saveFood = async function() {
     price,
     discount: parseFloat(v('fDiscount')) || 0,
     tag: v('fTag') || '',
+    searchTags: (v('fSearchTags')||'').split(',').map(x=>x.trim()).filter(Boolean),
     image: imgUrl,
     images: allImgUrls,
     active: v('fActive') === 'true',
