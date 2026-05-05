@@ -478,6 +478,7 @@ select.form-input { appearance:auto; }
           <button class="btn btn-danger" onclick="clearCollectionData('orders','সব অর্ডার')">🗑️ Clear Orders</button>
           <button class="btn btn-danger" onclick="clearCollectionData('chats','সব চ্যাট')">🗑️ Delete Chats</button>
           <button class="btn btn-danger" onclick="clearCollectionData('payments','সব পেমেন্ট')">🗑️ Delete Payments</button>
+          <button class="btn btn-danger" onclick="deleteAllFoodsFinal()">🗑️ Delete All Food</button>
           <button class="btn btn-danger" onclick="clearAllData()">🔥 Clear All Data</button>
         </div>
       </div>
@@ -922,7 +923,8 @@ async function loadSettings() {
   } catch(e) {
     try { settings = JSON.parse(localStorage.getItem('kaliaff_settings_backup') || '{}'); } catch(_) { settings = {}; }
   }
-  try { const local = JSON.parse(localStorage.getItem('kaliaff_settings_backup') || '{}'); settings = {...local, ...settings}; } catch(_) {}
+  // Local backup must win in this browser so saved settings do not disappear after refresh when Firestore rules/auth fail.
+  try { const local = JSON.parse(localStorage.getItem('kaliaff_settings_backup') || '{}'); settings = {...settings, ...local}; } catch(_) {}
   fillSettings();
 }
 
@@ -935,7 +937,12 @@ function fillSettings() {
   f('sDeliveryAreaNotice',settings.deliveryAreaNotice);
   f('sFbLink',settings.fbLink); f('sWaNumber',settings.waNumber); f('sEmail',settings.email);
   f('sLocationLink',settings.locationLink);
-  f('sLogoUrl',settings.logoUrl); f('sAppDownloadLink',settings.appDownloadLink);
+  f('sLogoUrl',settings.logoUrl); f('sAppDownloadLink',settings.appDownloadLink); f('sAppDownloadLink2',settings.appDownloadLink2 || settings.appDownloadLink);
+  f('sPwaInstallPopup',settings.pwaInstallPopup===false?'false':'true');
+  f('sBannerActive',settings.bannerActive===false?'false':'true');
+  f('sWhatsAppLink',settings.whatsAppLink || settings.whatsappLink || settings.waLink);
+  f('sHomeSectionOrder',settings.homeSectionOrder);
+  f('sCouponExpiry',settings.couponExpiry); f('sCouponLimit',settings.couponLimit);
   f('sNotificationText',settings.notificationText); f('sSeoTitle',settings.seoTitle);
   f('sSeoDescription',settings.seoDescription); f('sSeoKeywords',settings.seoKeywords);
   f('sGoogleAnalyticsId',settings.googleAnalyticsId); f('sFacebookPixelId',settings.facebookPixelId);
@@ -946,6 +953,7 @@ function fillSettings() {
   f('sGeminiApiKey',settings.geminiApiKey);
   f('sAdminPass',settings.adminPassword);
   f('sFlashTitle',settings.flashTitle); f('sFlashBtn',settings.flashBtn); f('sFlashActive',settings.flashActive===false?'false':'true');
+  f('sLoyaltyPointPercent',settings.loyaltyPointPercent||1); f('sLoyaltyPointValue',settings.loyaltyPointValue||1);
   f('sLoyaltyEligibleMin',settings.loyaltyEligibleMin||150); f('sLoyaltyTargetAmount',settings.loyaltyTargetAmount||800); f('sLoyaltyMinOrders',settings.loyaltyMinOrders||3); f('sLoyaltyRewardPoints',settings.loyaltyRewardPoints||1000); f('sLoyaltyMaxPoints',settings.loyaltyMaxPoints||1000); f('sReferralBonusPoints',settings.referralBonusPoints||100); f('sReviewBonusPoints',settings.reviewBonusPoints||25); f('sFreeDeliveryMinOrder',settings.freeDeliveryMinOrder||500);
   if(settings.flashEnd){ const el=document.getElementById('sFlashEnd'); if(el) el.value=String(settings.flashEnd).slice(0,16); }
   previewLogoUrl();
@@ -964,7 +972,12 @@ window.saveSettings = async function() {
     adminAlertWhatsApp: v('sAdminAlertWhatsApp') || v('sWaNumber'), adminAlertEmail: v('sAdminAlertEmail') || v('sEmail'),
     autoAdminAlert: v('sAutoAdminAlert') !== 'false', autoCustomerStatus: v('sAutoCustomerStatus') !== 'false',
     locationLink: v('sLocationLink'),
-    logoUrl: v('sLogoUrl'), appDownloadLink: v('sAppDownloadLink'),
+    logoUrl: v('sLogoUrl'), appDownloadLink: v('sAppDownloadLink'), appDownloadLink2: v('sAppDownloadLink2'),
+    pwaInstallPopup: v('sPwaInstallPopup') !== 'false',
+    bannerActive: v('sBannerActive') !== 'false',
+    whatsAppLink: v('sWhatsAppLink'), whatsappLink: v('sWhatsAppLink'), waLink: v('sWhatsAppLink'),
+    homeSectionOrder: v('sHomeSectionOrder'),
+    couponExpiry: v('sCouponExpiry'), couponLimit: parseInt(v('sCouponLimit'))||0,
     notificationText: v('sNotificationText'), seoTitle: v('sSeoTitle'),
     seoDescription: v('sSeoDescription'), seoKeywords: v('sSeoKeywords'),
     googleAnalyticsId: v('sGoogleAnalyticsId'), facebookPixelId: v('sFacebookPixelId'),
@@ -972,8 +985,16 @@ window.saveSettings = async function() {
     adminPassword: v('sAdminPass') || settings.adminPassword || '2026',
     imgbbKey: v('sImgbbKey'),
     flashTitle: v('sFlashTitle'), flashEnd: v('sFlashEnd'), flashBtn: v('sFlashBtn'), flashActive: v('sFlashActive')!=='false',
+    loyaltyPointPercent: parseFloat(v('sLoyaltyPointPercent'))||1, loyaltyPointValue: parseFloat(v('sLoyaltyPointValue'))||1,
     loyaltyEligibleMin: parseInt(v('sLoyaltyEligibleMin'))||150, loyaltyTargetAmount: parseInt(v('sLoyaltyTargetAmount'))||800, loyaltyMinOrders: parseInt(v('sLoyaltyMinOrders'))||3, loyaltyRewardPoints: parseInt(v('sLoyaltyRewardPoints'))||1000, loyaltyMaxPoints: parseInt(v('sLoyaltyMaxPoints'))||1000, referralBonusPoints: parseInt(v('sReferralBonusPoints'))||100, reviewBonusPoints: parseInt(v('sReviewBonusPoints'))||25, freeDeliveryMinOrder: parseInt(v('sFreeDeliveryMinOrder'))||0
   };
+  // Catch every Settings field automatically, so future/new inputs also stay saved after refresh.
+  document.querySelectorAll('#secSettings [id^="s"], #secCoupons [id^="s"], #secLoyalty [id^="s"], #secControls [id^="s"]').forEach(el => {
+    if(!/^s[A-Z]/.test(el.id)) return;
+    const key = el.id.slice(1,2).toLowerCase() + el.id.slice(2);
+    if(el.type === 'checkbox') data[key] = !!el.checked;
+    else data[key] = el.value;
+  });
   try {
     data.updatedAt = _serverTimestamp();
     await _setDoc(_doc(_db,'settings','main'), data, {merge:true});
@@ -1756,6 +1777,21 @@ window.updatePaymentStatus = async function(docId, status) {
 }
 
 
+
+// ===== SAFE DELETE PASSWORD GUARD =====
+function getCurrentAdminPassword(){
+  return (v('sAdminPass') || settings.adminPassword || localStorage.getItem('kaliaff_admin_password') || '2026').trim();
+}
+window.requireDeletePassword = function(actionLabel){
+  const pass = prompt('ডিলিট করার আগে Admin Password দিন:\n' + (actionLabel || ''));
+  if(pass === null) return false;
+  if(String(pass).trim() !== getCurrentAdminPassword()){
+    showToast('❌ Password ভুল, delete করা হয়নি','error');
+    return false;
+  }
+  return true;
+}
+
 // ===== CATEGORIES & ADMIN CONTROLS =====
 async function loadCategories(){
   try{ const snap=await _getDocs(_col(_db,'categories')); allCategories=[]; snap.forEach(d=>allCategories.push({_id:d.id,...d.data()})); renderCategories(); }
@@ -1772,8 +1808,8 @@ window.addCategory=async function(){
   catch(e){ showToast('❌ ক্যাটেগরি যোগ সমস্যা','error'); }
 }
 window.deleteCategory=async function(id){ if(!confirm('ক্যাটেগরি ডিলিট করবেন?')) return; try{ await _deleteDoc(_doc(_db,'categories',id)); allCategories=allCategories.filter(c=>c._id!==id); renderCategories(); showToast('✅ ডিলিট হয়েছে','success'); }catch(e){showToast('❌ ডিলিট সমস্যা','error');} }
-window.clearCollectionData=async function(colName,label){ if(!confirm(label+' ডিলিট করবেন?')) return; try{ const snap=await _getDocs(_col(_db,colName)); const jobs=[]; snap.forEach(d=>jobs.push(_deleteDoc(_doc(_db,colName,d.id)))); await Promise.all(jobs); showToast('✅ '+label+' ক্লিয়ার হয়েছে','success'); if(colName==='orders') loadOrders(); if(colName==='chats') loadChats(); if(colName==='payments') loadPayments(); }catch(e){ showToast('❌ Clear সমস্যা','error'); } }
-window.clearAllData=async function(){ if(!confirm('Orders, Chats, Payments সব ডিলিট করবেন?')) return; for(const c of ['orders','chats','payments']){ const snap=await _getDocs(_col(_db,c)); const jobs=[]; snap.forEach(d=>jobs.push(_deleteDoc(_doc(_db,c,d.id)))); await Promise.all(jobs); } showToast('✅ All data cleared','success'); loadOrders(); loadChats(); loadPayments(); }
+window.clearCollectionData=async function(colName,label){ if(!confirm(label+' ডিলিট করবেন?')) return; if(!requireDeletePassword(label)) return; try{ const snap=await _getDocs(_col(_db,colName)); const jobs=[]; snap.forEach(d=>jobs.push(_deleteDoc(_doc(_db,colName,d.id)))); await Promise.all(jobs); showToast('✅ '+label+' ক্লিয়ার হয়েছে','success'); if(colName==='orders') loadOrders(); if(colName==='chats') loadChats(); if(colName==='payments') loadPayments(); }catch(e){ showToast('❌ Clear সমস্যা','error'); } }
+window.clearAllData=async function(){ if(!confirm('Orders, Chats, Payments সব ডিলিট করবেন?')) return; if(!requireDeletePassword('All data delete')) return; for(const c of ['orders','chats','payments']){ const snap=await _getDocs(_col(_db,c)); const jobs=[]; snap.forEach(d=>jobs.push(_deleteDoc(_doc(_db,c,d.id)))); await Promise.all(jobs); } showToast('✅ All data cleared','success'); loadOrders(); loadChats(); loadPayments(); }
 window.deleteChatSession=async function(sessionId){ if(!confirm('এই চ্যাট session ডিলিট করবেন?')) return; try{ const snap=await _getDocs(_col(_db,'chats')); const jobs=[]; snap.forEach(d=>{ if(d.data().sessionId===sessionId) jobs.push(_deleteDoc(_doc(_db,'chats',d.id))); }); await Promise.all(jobs); loadChats(); showToast('✅ চ্যাট ডিলিট হয়েছে','success'); }catch(e){showToast('❌ চ্যাট ডিলিট সমস্যা','error');} }
 window.deletePayment=async function(id){ if(!confirm('এই পেমেন্ট ডিলিট করবেন?')) return; try{ await _deleteDoc(_doc(_db,'payments',id)); allPayments=allPayments.filter(p=>p._id!==id); renderPayments(); showToast('✅ পেমেন্ট ডিলিট হয়েছে','success'); }catch(e){showToast('❌ ডিলিট সমস্যা','error');} }
 
@@ -1995,7 +2031,7 @@ setTimeout(()=>{try{syncCategoryDatalist();}catch(e){}},1500);
     var oldEdit=window.editFood;
     window.editFood=function(docId){ addStableUi(); var f=currentFoods().find(function(x){return x._id===docId || x.id===docId;}); if(typeof oldEdit==='function') oldEdit(docId); setTimeout(function(){ addStableUi(); if(f){ var imgs=(Array.isArray(f.images)&&f.images.length?f.images:(f.image?[f.image]:[])); setImageBoxes(imgs); previewUrlBoxes(); } },120); };
     window.deleteFood=async function(docId){ if(!docId) return; if(!confirm('এই পণ্যটি delete করবেন? User site থেকেও গায়েব হবে।')) return; try{ var mode=await hardOrSoftDelete(docId); var next=currentFoods().filter(function(f){return (f._id||f.id)!==docId;}); setFoods(next); renderAll(); toast(mode==='hard'?'✅ পণ্য permanent delete হয়েছে':'✅ পণ্য hide/delete হয়েছে','success'); } catch(e){ console.error(e); toast('❌ Delete হয়নি: Firebase Rules/Auth চেক করুন','error'); } };
-    window.deleteAllFoodsFinal=async function(){ if(!confirm('সব পণ্য delete/hide করবেন? Old added products-ও remove হবে।')) return; try{ var snap=await _getDocs(_col(_db,'foods')); var ids=[]; snap.forEach(function(d){ids.push(d.id);}); var hard=0,soft=0,fail=0; for(var i=0;i<ids.length;i++){ try{ var m=await hardOrSoftDelete(ids[i]); if(m==='hard')hard++; else soft++; }catch(e){ console.error('delete failed',ids[i],e); fail++; } } setFoods([]); renderAll(); toast('✅ Done: '+hard+' permanent, '+soft+' hide'+(fail?', '+fail+' failed':''),'success'); } catch(e){ console.error(e); toast('❌ All delete সমস্যা: Firebase permission/auth চেক করুন','error'); } };
+    window.deleteAllFoodsFinal=async function(){ if(!confirm('সব পণ্য delete/hide করবেন? Old added products-ও remove হবে।')) return; if(!requireDeletePassword('সব পণ্য delete')) return; try{ var snap=await _getDocs(_col(_db,'foods')); var ids=[]; snap.forEach(function(d){ids.push(d.id);}); var hard=0,soft=0,fail=0; for(var i=0;i<ids.length;i++){ try{ var m=await hardOrSoftDelete(ids[i]); if(m==='hard')hard++; else soft++; }catch(e){ console.error('delete failed',ids[i],e); fail++; } } setFoods([]); renderAll(); toast('✅ Done: '+hard+' permanent, '+soft+' hide'+(fail?', '+fail+' failed':''),'success'); } catch(e){ console.error(e); toast('❌ All delete সমস্যা: Firebase permission/auth চেক করুন','error'); } };
     window.saveFood=async function(){ addStableUi(); var modalBox=document.querySelector('#foodModalBg .modal-box'); var saveBtn=document.querySelector('#foodModalBg .btn-primary'); var name=val('fName'), category=val('fCategory'), price=parseFloat(val('fPrice')); if(!name){toast('❌ খাবারের নাম দিন','error');return;} if(!category){toast('❌ ক্যাটেগরি দিন','error');return;} if(isNaN(price)||price<=0){toast('❌ সঠিক দাম দিন','error');return;} if(saveBtn){saveBtn.disabled=true;saveBtn.innerHTML='⏳ সেভ হচ্ছে...';} if(modalBox) modalBox.classList.add('final-saving');
       try{ var docId=val('fId'); var allImgUrls=getImageUrlsFromBoxes(); var imgUrl=allImgUrls[0]||''; var existing=docId?currentFoods().find(function(f){return (f._id||f.id)===docId;}):null; if(!allImgUrls.length && existing){ allImgUrls=(Array.isArray(existing.images)&&existing.images.length?existing.images:(existing.image?[existing.image]:[])); imgUrl=allImgUrls[0]||''; }
         if(((typeof foodImgsBase64!=='undefined' && Array.isArray(foodImgsBase64) && foodImgsBase64.length>0) || (Array.isArray(window.foodImgsBase64) && (typeof foodImgsBase64!=='undefined'?foodImgsBase64:window.foodImgsBase64).length>0))){ var imgbbKey=window._imgbbKey||val('sImgbbKey'); if(!imgbbKey) throw new Error('ImgBB API Key নেই। Settings এ key দিন অথবা ছবি URL boxes ব্যবহার করুন।'); allImgUrls=[]; for(var j=0;j<(typeof foodImgsBase64!=='undefined'?foodImgsBase64:window.foodImgsBase64).length;j++){ try{ var compressed=typeof compressImage==='function'?await compressImage((typeof foodImgsBase64!=='undefined'?foodImgsBase64:window.foodImgsBase64)[j],1024,.85):(typeof foodImgsBase64!=='undefined'?foodImgsBase64:window.foodImgsBase64)[j]; var url=await uploadToImgBB(compressed,imgbbKey); allImgUrls.push(url); }catch(up){ console.error(up); } } if(!allImgUrls.length) throw new Error('ছবি upload হয়নি। URL box দিয়ে চেষ্টা করুন।'); imgUrl=allImgUrls[0]; setImageBoxes(allImgUrls); }
@@ -2099,6 +2135,148 @@ setTimeout(()=>{try{syncCategoryDatalist();}catch(e){}},1500);
       if(!document.getElementById('updateFullMenuImagesBtn')){ const btn2=document.createElement('button'); btn2.id='updateFullMenuImagesBtn'; btn2.className='btn btn-warning'; btn2.textContent='🖼️ Update Images/Variants'; btn2.onclick=window.kaliaffUpdateFullMenuImagesVariants; head.appendChild(btn2); }
     },1200);
   });
+})();
+</script>
+
+<!-- ===== CUSTOM ADMIN PATCH 2026-05-05 ===== -->
+<style>
+.kf-img-chip{position:relative;display:inline-block;margin:6px}.kf-img-chip img{width:74px;height:74px;object-fit:cover;border-radius:10px;border:2px solid #eee}.kf-img-chip button{position:absolute;right:-7px;top:-7px;border:none;background:#e74c3c;color:#fff;border-radius:50%;width:23px;height:23px;font-weight:900;cursor:pointer}.kf-admin-note{background:#fff8e8;border:1px solid #f39c12;border-radius:10px;padding:10px;margin:8px 0;color:#7a4f3a;font-size:.82rem;line-height:1.55}.kf-setting-extra{border:2px solid #f39c12!important}
+</style>
+<script>
+(function(){
+  function v(id){return (document.getElementById(id)?.value||'').trim()}
+  function setv(id,val){const el=document.getElementById(id); if(el&&val!==undefined&&val!==null)el.value=val}
+  function boolVal(id){return v(id)!=='false'}
+  function addAdminControls(){
+    const settingsSec=document.getElementById('settingsSection')||document.querySelector('#settings.section')||document.querySelector('.section.active');
+    const saveBtn=[...document.querySelectorAll('button')].find(b=>/সেটিংস সেভ/.test(b.textContent||''));
+    if(saveBtn&&!document.getElementById('kfExtraSettings')){const box=document.createElement('div');box.id='kfExtraSettings';box.className='settings-card kf-setting-extra';box.innerHTML=`<h4>✅ New Feature Control</h4><div class="settings-grid"><div class="form-group"><label class="form-label">Loyalty Point Percent (%)</label><input class="form-input" id="sLoyaltyPointPercent" type="number" placeholder="10"></div><div class="form-group"><label class="form-label">1 Point Value (৳)</label><input class="form-input" id="sLoyaltyPointValue" type="number" placeholder="1"></div><div class="form-group"><label class="form-label">Banner ON/OFF</label><select class="form-input" id="sBannerActive"><option value="true">ON</option><option value="false">OFF</option></select></div><div class="form-group"><label class="form-label">App Download Popup</label><input class="form-input" id="sAppDownloadLink2" placeholder="App link / APK / Play Store"></div></div><div class="kf-admin-note">Default: ১০% loyalty point। যেমন ১০০০ টাকার খাবার কিনলে ১০০ point যোগ হবে, ১ point = ১ টাকা food value। Banner OFF করলে user site-এ কোনো banner দেখাবে না।</div>`;saveBtn.parentNode.insertBefore(box,saveBtn);}
+    if(!document.getElementById('kfBannerHelp')){const bannerBtn=[...document.querySelectorAll('button')].find(b=>/ব্যানার|Banner/.test(b.textContent||'')&&/নতুন|add|যোগ/i.test(b.textContent||'')); if(bannerBtn){const n=document.createElement('div');n.id='kfBannerHelp';n.className='kf-admin-note';n.innerHTML='Banner এ শুধু image থাকবে। Food URL দিলে user পাশে শুধু <b>Shop Now</b> button দেখবে, কোনো লেখা দেখাবে না।';bannerBtn.parentNode.appendChild(n);}}
+  }
+  const oldFill=window.fillSettings; window.fillSettings=function(){if(oldFill)oldFill();setTimeout(()=>{addAdminControls(); const s=window.settings||{};setv('sLoyaltyPointPercent',s.loyaltyPointPercent||10);setv('sLoyaltyPointValue',s.loyaltyPointValue||1);setv('sBannerActive',s.bannerActive===false?'false':'true');setv('sAppDownloadLink2',s.appDownloadLink||'');},0)};
+  const oldSave=window.saveSettings; window.saveSettings=async function(){
+    if(document.getElementById('sAppDownloadLink2')&&!v('sAppDownloadLink')) setv('sAppDownloadLink',v('sAppDownloadLink2'));
+    const extra={loyaltyPointPercent:parseFloat(v('sLoyaltyPointPercent'))||10,loyaltyPointValue:parseFloat(v('sLoyaltyPointValue'))||1,bannerActive:boolVal('sBannerActive'),appDownloadLink:v('sAppDownloadLink2')||v('sAppDownloadLink')};
+    if(oldSave) await oldSave.apply(this,arguments);
+    try{await _setDoc(_doc(_db,'settings','main'),extra,{merge:true});window.settings={...(window.settings||{}),...extra};localStorage.setItem('kaliaff_settings_backup',JSON.stringify({...JSON.parse(localStorage.getItem('kaliaff_settings_backup')||'{}'),...extra,updatedAtLocal:new Date().toISOString()}));showToast('✅ New feature settings save হয়েছে','success');}catch(e){localStorage.setItem('kaliaff_settings_backup',JSON.stringify({...JSON.parse(localStorage.getItem('kaliaff_settings_backup')||'{}'),...extra,updatedAtLocal:new Date().toISOString()}));}
+  };
+  window.kfRemoveExistingFoodImage=function(i){try{window.kfExistingFoodImages=(window.kfExistingFoodImages||[]).filter((_,idx)=>idx!==i);renderKfExistingImgs();}catch(e){}}
+  function renderKfExistingImgs(){let box=document.getElementById('kfExistingImgsBox'); if(!box){const up=document.querySelector('#foodModalBg .img-upload')||document.querySelector('#foodModalBg input[type=file]'); if(!up)return; box=document.createElement('div');box.id='kfExistingImgsBox';up.parentNode.insertBefore(box,up);} const arr=window.kfExistingFoodImages||[];box.innerHTML=arr.map((src,i)=>`<span class="kf-img-chip"><img src="${src}"><button onclick="kfRemoveExistingFoodImage(${i})">×</button></span>`).join('');}
+  const oldOpenFood=window.openFoodModal; if(oldOpenFood){window.openFoodModal=function(docId){oldOpenFood.apply(this,arguments);setTimeout(()=>{const f=(window.allFoods||[]).find(x=>x._id===docId||x.id===docId)||{};window.kfExistingFoodImages=(f.images&&f.images.length?f.images:(f.image?[f.image]:[])).slice();renderKfExistingImgs();},100)}}
+  const oldSaveFood=window.saveFood; if(oldSaveFood){window.saveFood=async function(){try{const id=window.currentFoodDocId||window.editingFoodId||window.currentEditFoodId; if(id&&window.kfExistingFoodImages){const f=(window.allFoods||[]).find(x=>x._id===id||x.id===id); if(f){f.images=window.kfExistingFoodImages.slice(); f.image=f.images[0]||'';}}}catch(e){} return oldSaveFood.apply(this,arguments)}}
+  const oldOpenBanner=window.openBannerModal; if(oldOpenBanner){window.openBannerModal=function(){oldOpenBanner.apply(this,arguments);setTimeout(()=>{const title=document.getElementById('bTitle'),sub=document.getElementById('bSub'),det=document.getElementById('bDetails');[title,sub,det].forEach(x=>{if(x)x.value='';}); const link=document.getElementById('bLink')||document.getElementById('bFoodUrl'); if(link)link.placeholder='Food URL / Shop Now link';},50)}}
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(addAdminControls,1000));
+})();
+</script>
+
+
+
+<!-- ===== FOLLOWUP FIX PATCH 2026-05-05: settings persistence + product order + image remove ===== -->
+<style>
+.kf-order-tools{display:flex;gap:5px;align-items:center;flex-wrap:wrap}.kf-sort-input{width:78px!important;padding:5px 7px!important;font-size:.78rem!important}.kf-whatsapp-link-note{font-size:.74rem;color:#7a4f3a;margin-top:4px}.kf-img-chip{position:relative;display:inline-block;margin:5px}.kf-img-chip img{width:74px;height:74px;object-fit:cover;border-radius:10px;border:2px solid #eee}.kf-img-chip button{position:absolute;right:-7px;top:-7px;border:none;background:#e74c3c;color:#fff;border-radius:50%;width:23px;height:23px;font-weight:900;cursor:pointer;box-shadow:0 3px 9px rgba(0,0,0,.22)}
+</style>
+<script id="kfFollowupAdminPatch">
+(function(){
+  function ready(fn){ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',fn); else fn(); }
+  function q(id){return document.getElementById(id)}
+  function val(id){return (q(id)?.value||'').trim()}
+  function setVal(id,v){const el=q(id); if(el && v!==undefined && v!==null) el.value=v}
+  function toast(m,t){ if(typeof showToast==='function') showToast(m,t||'success'); else alert(m); }
+  function safeNum(x,d){x=parseInt(x,10); return Number.isFinite(x)?x:d;}
+  function currentFoods(){ return Array.isArray(window.allFoods)?window.allFoods:(typeof allFoods!=='undefined'?allFoods:[]); }
+  function setFoods(list){ if(Array.isArray(window.allFoods)) window.allFoods=list; try{allFoods=list}catch(e){} }
+  function sortFoodsList(list){ return (list||[]).sort(function(a,b){
+    const ao = Number.isFinite(parseInt(a.sortOrder,10)) ? parseInt(a.sortOrder,10) : 999999;
+    const bo = Number.isFinite(parseInt(b.sortOrder,10)) ? parseInt(b.sortOrder,10) : 999999;
+    if(ao!==bo) return ao-bo;
+    const ac = a.createdAt?.seconds || a.createdAt || 0, bc = b.createdAt?.seconds || b.createdAt || 0;
+    return (bc||0)-(ac||0);
+  });}
+  window.kfSortFoodsList=sortFoodsList;
+
+  function ensureSettingsInputs(){
+    const wa=q('sWaNumber');
+    if(wa && !q('sWhatsAppLink')){
+      const wrap=document.createElement('div'); wrap.className='form-group';
+      wrap.innerHTML='<label class="form-label">WhatsApp লিংক</label><input class="form-input" id="sWhatsAppLink" placeholder="https://wa.me/8801XXXXXXXXX"><div class="kf-whatsapp-link-note">নম্বর দিলেও হবে, লিংক দিলে সেটাই user side/social button এ থাকবে।</div>';
+      wa.closest('.settings-grid')?.appendChild(wrap);
+    }
+  }
+  function makeWaLink(s){
+    const link=(s.whatsappLink||s.waLink||'').trim(); if(link) return link;
+    const n=String(s.waNumber||s.phone||'').replace(/[^0-9]/g,''); return n?'https://wa.me/'+n:'';
+  }
+  function ensureFoodOrderInput(){
+    const price=q('fPrice');
+    if(price && !q('fSortOrder')){
+      const div=document.createElement('div'); div.className='form-group';
+      div.innerHTML='<label class="form-label">পণ্যের সিরিয়াল / Order</label><input class="form-input" id="fSortOrder" type="number" placeholder="1 = সবার আগে"><div class="v6-mini-note">ছোট সংখ্যা আগে দেখাবে। খালি রাখলে নতুন পণ্য আগে থাকবে।</div>';
+      const row=price.closest('.form-row'); row?.appendChild(div);
+    }
+  }
+  function renderImageChips(urls){
+    const grid=q('fImgPreviewGrid'); if(!grid) return;
+    urls=(urls||[]).filter(Boolean).slice(0,6);
+    grid.innerHTML=urls.map(function(src,i){return '<div class="kf-img-chip" data-img="'+src.replace(/"/g,'&quot;')+'"><img src="'+src.replace(/"/g,'&quot;')+'" onerror="this.style.opacity=.35"><button type="button" onclick="kfRemoveImageAt('+i+')">×</button>'+(i===0?'<span style="position:absolute;bottom:2px;left:2px;background:#c0392b;color:white;font-size:.6rem;padding:1px 4px;border-radius:4px">Main</span>':'')+'</div>';}).join('');
+  }
+  window.kfRemoveImageAt=function(i){
+    let urls=[]; for(let n=1;n<=6;n++){const v=val('fImgUrl'+n); if(v) urls.push(v);} if(!urls.length) urls=Array.from(document.querySelectorAll('#fImgPreviewGrid .kf-img-chip')).map(x=>x.dataset.img).filter(Boolean);
+    urls.splice(i,1); for(let n=1;n<=6;n++) setVal('fImgUrl'+n, urls[n-1]||''); setVal('fImgUrl', urls[0]||'');
+    try{ if(typeof foodImgsBase64!=='undefined' && Array.isArray(foodImgsBase64)) foodImgsBase64.splice(i,1); }catch(e){}
+    renderImageChips(urls);
+  };
+
+  function patchSettings(){
+    ensureSettingsInputs();
+    const oldFill=window.fillSettings;
+    window.fillSettings=function(){ if(oldFill) oldFill(); ensureSettingsInputs(); setVal('sWhatsAppLink', (window.settings||{}).whatsappLink || (window.settings||{}).waLink || makeWaLink(window.settings||{})); };
+    const oldSave=window.saveSettings;
+    window.saveSettings=async function(){
+      ensureSettingsInputs();
+      const dataExtra={
+        bkash:val('sBkash'), nagad:val('sNagad'), waNumber:val('sWaNumber'), whatsappLink:val('sWhatsAppLink'),
+        fbLink:val('sFbLink'), email:val('sEmail'), phone:val('sPhone')
+      };
+      if(!dataExtra.whatsappLink) dataExtra.whatsappLink=makeWaLink(dataExtra);
+      try{
+        if(oldSave) await oldSave();
+        const merged=Object.assign({}, JSON.parse(localStorage.getItem('kaliaff_settings_backup')||'{}'), dataExtra, {updatedAtLocal:new Date().toISOString()});
+        localStorage.setItem('kaliaff_settings_backup', JSON.stringify(merged));
+        try{ await _setDoc(_doc(_db,'settings','main'), dataExtra, {merge:true}); }catch(e){ console.warn('extra settings firestore save skipped',e); }
+        window.settings=Object.assign(window.settings||{}, dataExtra);
+        toast('✅ bKash/Nagad/WhatsApp link সহ settings save হয়েছে','success');
+      }catch(e){
+        const merged=Object.assign({}, JSON.parse(localStorage.getItem('kaliaff_settings_backup')||'{}'), dataExtra, {updatedAtLocal:new Date().toISOString()});
+        localStorage.setItem('kaliaff_settings_backup', JSON.stringify(merged));
+        window.settings=Object.assign(window.settings||{}, dataExtra);
+        toast('⚠️ Firebase সমস্যা, তবে browser backup save হয়েছে','error');
+      }
+    };
+  }
+
+  function patchFoods(){
+    ensureFoodOrderInput();
+    const oldLoad=window.loadFoods;
+    window.loadFoods=async function(){ if(oldLoad) await oldLoad(); const sorted=sortFoodsList(currentFoods()); setFoods(sorted); if(typeof window.renderFoods==='function') window.renderFoods(); };
+    const oldOpen=window.openFoodModal;
+    window.openFoodModal=function(docId){ ensureFoodOrderInput(); if(oldOpen) oldOpen(docId); setTimeout(function(){ ensureFoodOrderInput(); if(!docId){ const list=currentFoods(); const nums=list.map(f=>parseInt(f.sortOrder,10)).filter(Number.isFinite); setVal('fSortOrder', nums.length?Math.min.apply(null,nums)-1:1); } },80); };
+    const oldEdit=window.editFood;
+    window.editFood=function(docId){ ensureFoodOrderInput(); const f=currentFoods().find(x=>(x._id||x.id)===docId); if(oldEdit) oldEdit(docId); setTimeout(function(){ ensureFoodOrderInput(); if(f){ setVal('fSortOrder', Number.isFinite(parseInt(f.sortOrder,10))?parseInt(f.sortOrder,10):''); const imgs=(Array.isArray(f.images)&&f.images.length?f.images:(f.image?[f.image]:[])); for(let n=1;n<=6;n++) setVal('fImgUrl'+n, imgs[n-1]||''); renderImageChips(imgs); } },180); };
+    const oldRender=window.renderFoods;
+    window.renderFoods=function(){ const sorted=sortFoodsList(currentFoods()); setFoods(sorted); if(oldRender) oldRender(); setTimeout(addOrderControls,30); };
+    function addOrderControls(){
+      document.querySelectorAll('#foodsBody tr').forEach(function(tr,idx){
+        const f=currentFoods()[idx]; if(!f||tr.dataset.kfOrder) return; tr.dataset.kfOrder='1';
+        const cell=tr.children[6]; if(cell){ cell.innerHTML='<div class="kf-order-tools"><input class="form-input kf-sort-input" type="number" value="'+(Number.isFinite(parseInt(f.sortOrder,10))?parseInt(f.sortOrder,10):idx+1)+'" onchange="kfSetProductOrder(\''+(f._id||f.id)+'\',this.value)"><button class="btn btn-sm" onclick="kfMoveProduct(\''+(f._id||f.id)+'\',-1)">↑</button><button class="btn btn-sm" onclick="kfMoveProduct(\''+(f._id||f.id)+'\',1)">↓</button></div>'; }
+      });
+    }
+    window.kfSetProductOrder=async function(id,value){ const n=safeNum(value,999999); const list=currentFoods(); const f=list.find(x=>(x._id||x.id)===id); if(f) f.sortOrder=n; try{ await _updateDoc(_doc(_db,'foods',id),{sortOrder:n,updatedAt:_serverTimestamp()}); toast('✅ Product order save হয়েছে','success'); }catch(e){ toast('⚠️ Order local save হয়েছে, Firebase rules চেক করুন','error'); } if(typeof window.renderFoods==='function') window.renderFoods(); };
+    window.kfMoveProduct=async function(id,dir){ const list=sortFoodsList(currentFoods()); const idx=list.findIndex(x=>(x._id||x.id)===id); const j=idx+dir; if(idx<0||j<0||j>=list.length)return; list.forEach((f,i)=>{ if(!Number.isFinite(parseInt(f.sortOrder,10))) f.sortOrder=i+1; }); const a=list[idx], b=list[j], temp=a.sortOrder; a.sortOrder=b.sortOrder; b.sortOrder=temp; setFoods(list); try{ await Promise.all([_updateDoc(_doc(_db,'foods',a._id||a.id),{sortOrder:a.sortOrder,updatedAt:_serverTimestamp()}),_updateDoc(_doc(_db,'foods',b._id||b.id),{sortOrder:b.sortOrder,updatedAt:_serverTimestamp()})]); }catch(e){} if(typeof window.renderFoods==='function') window.renderFoods(); };
+    const oldSave=window.saveFood;
+    window.saveFood=async function(){ ensureFoodOrderInput(); const before=currentFoods().length; const orderVal=safeNum(val('fSortOrder'), before+1); const docId=val('fId'); await oldSave.apply(this,arguments); try{ if(docId){ await _updateDoc(_doc(_db,'foods',docId),{sortOrder:orderVal,updatedAt:_serverTimestamp()}); const f=currentFoods().find(x=>(x._id||x.id)===docId); if(f)f.sortOrder=orderVal; } else { await window.loadFoods?.(); const match=currentFoods().find(f=>f.name===val('fName') && !Number.isFinite(parseInt(f.sortOrder,10))); if(match){ await _updateDoc(_doc(_db,'foods',match._id||match.id),{sortOrder:orderVal,updatedAt:_serverTimestamp()}); match.sortOrder=orderVal; } } }catch(e){ console.warn('sortOrder post-save skipped',e); } if(typeof window.renderFoods==='function') window.renderFoods(); };
+    setTimeout(addOrderControls,900);
+  }
+  ready(function(){ patchSettings(); patchFoods(); setTimeout(function(){ensureSettingsInputs(); ensureFoodOrderInput(); if(window.fillSettings) window.fillSettings(); if(window.renderFoods) window.renderFoods();},1000); });
 })();
 </script>
 </body>
