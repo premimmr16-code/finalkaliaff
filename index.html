@@ -3164,6 +3164,54 @@ setTimeout(loadV6Tracking,1800);
 })();
 </script>
 
+
+<!-- ===== CUSTOM REQUEST PATCH 2026-05-05 ===== -->
+<style>
+.kf-app-popup-bg{position:fixed;inset:0;z-index:130000;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;padding:18px;backdrop-filter:blur(8px)}
+.kf-app-popup-bg.show{display:flex}.kf-app-popup{background:white;border-radius:24px;width:min(360px,94vw);padding:24px 18px;text-align:center;box-shadow:0 24px 70px rgba(0,0,0,.35);font-family:'Hind Siliguri',sans-serif}.kf-app-popup h3{color:#c0392b;margin-bottom:8px}.kf-app-actions{display:flex;gap:10px;margin-top:16px}.kf-app-actions a,.kf-app-actions button{flex:1;border:none;border-radius:16px;padding:11px 10px;font-family:inherit;font-weight:800;text-decoration:none;cursor:pointer}.kf-app-actions a{background:#c0392b;color:#fff}.kf-app-actions button{background:#eee;color:#3d1f0d}
+.kf-delivery-help{font-weight:900;color:#c0392b;background:#fff3cd;border:1px solid #f39c12;border-radius:10px;padding:9px 11px;margin:5px 0 10px;font-size:.9rem;line-height:1.55}
+footer .footer-grid{grid-template-columns:1.4fr 1fr 1fr!important}.kf-footer-details{font-size:.84rem;line-height:1.75;color:#ddd}.kf-footer-details b{color:#f39c12}.kf-loyalty-note{background:#fff8e8;border:2px dashed #f39c12;border-radius:12px;padding:10px;margin:10px 0;color:#3d1f0d;font-size:.85rem}
+.banner-slide.image-only .banner-shop-now-floating{display:inline-flex!important;position:absolute;left:50%;bottom:18px;transform:translateX(-50%);z-index:4;background:#25D366;color:#fff;border:none;border-radius:24px;padding:10px 22px;font-weight:900;text-decoration:none;box-shadow:0 10px 25px rgba(0,0,0,.28)}
+body:not(.home-route-active) .live-chat-btn,body:not(.home-route-active) .chat-window{display:none!important}
+</style>
+<div class="kf-app-popup-bg" id="kfAppPopup"><div class="kf-app-popup"><h3>📱 App Download করুন</h3><p>ভালো experience এর জন্য Kaliaff app download করুন।</p><div class="kf-app-actions"><a id="kfAppDownloadBtn" href="#" target="_blank" onclick="localStorage.setItem('kaliaff_app_downloaded','yes')">Download</a><button onclick="document.getElementById('kfAppPopup').classList.remove('show')">Cancel</button></div></div></div>
+<script>
+(function(){
+  function num(v,d){v=parseFloat(v);return isNaN(v)?d:v}
+  function getCfg(){return {percent:num((window.settings||{}).loyaltyPointPercent,10), value:num((window.settings||{}).loyaltyPointValue,1)}}
+  function esc(s){return String(s||'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
+  const oldApply=window.applySettings;
+  window.applySettings=function(){ if(oldApply) oldApply();
+    try{
+      document.body.classList.add('home-route-active');
+      const s=window.settings||{};
+      const fb=document.getElementById('footerLogo'); if(fb) fb.textContent=s.siteName||'Kaliaff';
+      const footer=document.querySelector('footer .footer-grid');
+      if(footer&&!document.getElementById('kfFooterCustom')) footer.innerHTML=`<div class="footer-brand"><div class="logo-text" id="footerLogo">${esc(s.siteName||'Kaliaff')}</div><div class="kf-footer-details"><b>${esc(s.siteName||'Kaliaff')}</b><br>${esc(s.address||'')}<br>📞 ${esc(s.phone||s.waNumber||'')}<br>✉️ ${esc(s.email||'')}</div></div><div><div class="footer-h">Social Media</div><div class="social-links"><a class="social-link" href="${esc(s.fbLink||'#')}" target="_blank">f</a><a class="social-link" href="https://wa.me/${String(s.waNumber||s.phone||'').replace(/[^0-9]/g,'')}" target="_blank">💬</a><a class="social-link" href="mailto:${esc(s.email||'')}">✉️</a></div></div><div id="kfFooterCustom"><div class="footer-h">Details</div><a class="footer-link" href="#home" onclick="bottomNav&&bottomNav('home')">Home</a><a class="footer-link" href="#me" onclick="bottomNav&&bottomNav('me')">Profile</a><a class="footer-link" href="#orders" onclick="bottomNav&&bottomNav('history')">Order History</a></div>`;
+      if(s.appDownloadLink && localStorage.getItem('kaliaff_app_downloaded')!=='yes'){ const a=document.getElementById('kfAppDownloadBtn'); if(a)a.href=s.appDownloadLink; setTimeout(()=>document.getElementById('kfAppPopup')?.classList.add('show'),900); }
+    }catch(e){}
+  };
+  const oldRenderBanner=window.renderBanners;
+  window.renderBanners=function(){
+    const s=window.settings||{}; if(s.bannerActive===false||s.bannerActive==='false'){document.getElementById('bannerSection')?.classList.remove('has-banners');return;}
+    const slider=document.getElementById('bannerSlider'), dots=document.getElementById('bannerDots'), section=document.getElementById('bannerSection');
+    const banners=(window.allBanners||[]).filter(b=>b&&b.image);
+    if(!slider||!section||!banners.length){ if(oldRenderBanner) oldRenderBanner(); return; }
+    section.classList.add('has-banners'); slider.innerHTML=banners.map((b,i)=>`<div class="banner-slide image-only has-image ${i===0?'active':''}"><img class="banner-img" src="${esc(b.image)}" alt="Banner"><a class="banner-shop-now-floating" href="${esc(b.foodUrl||b.link||'#')}" ${b.foodUrl||b.link?'target="_blank"':''}>Shop Now</a></div>`).join('');
+    if(dots)dots.innerHTML=banners.map((_,i)=>`<button class="banner-dot ${i===0?'active':''}" onclick="showBanner(${i})"></button>`).join('');
+  };
+  const oldBottom=window.bottomNav; if(oldBottom){window.bottomNav=function(name){oldBottom(name);document.body.classList.toggle('home-route-active',name==='home'); if(name!=='home')document.querySelector('.chat-window')?.classList.remove('open');};}
+  const oldOpenFood=window.openFoodDetail; if(oldOpenFood){window.openFoodDetail=function(){document.body.classList.remove('home-route-active');document.querySelector('.chat-window')?.classList.remove('open');return oldOpenFood.apply(this,arguments)}}
+  const oldClose=window.closeFoodDetail; if(oldClose){window.closeFoodDetail=function(){document.body.classList.add('home-route-active');return oldClose.apply(this,arguments)}}
+  function updateTransportHelp(){const el=document.getElementById('cTransport'); if(el&&!document.getElementById('kfDeliveryHelp')){const d=document.createElement('div');d.id='kfDeliveryHelp';d.className='kf-delivery-help';d.textContent='যাওয়া-আসার ভাড়ার সাথে ২০ টাকা বেশি যোগ হবে।';el.parentNode.insertBefore(d,el.nextSibling);}}
+  const oldOpenCheckout=window.openCheckout; if(oldOpenCheckout){window.openCheckout=function(){oldOpenCheckout.apply(this,arguments);setTimeout(updateTransportHelp,50)}}
+  const oldChat=window.addBotMessage||window.addChatMessage; document.addEventListener('DOMContentLoaded',()=>{setTimeout(()=>{document.querySelectorAll('.chat-msg.bot').forEach(x=>{if(/নমস্কার|nomoskar|namaskar/i.test(x.textContent))x.textContent='Kaliaff এ স্বাগতম';});},1500)});
+  window.kfAddLoyaltyPoints=async function(orderData){try{const cfg=getCfg(), p=Math.floor(num(orderData.subtotal||orderData.total,0)*cfg.percent/100); if(!p||!orderData.phone)return; const key=String(orderData.phone).replace(/[^0-9]/g,''); const ref=_doc(_db,'customers',key); const snap=await _getDoc(ref); const old=snap.exists()?snap.data():{}; await _setDoc(ref,{name:orderData.name||old.name||'',phone:orderData.phone,email:orderData.email||old.email||'',points:num(old.points,0)+p,loyaltyPercent:cfg.percent,pointValue:cfg.value,lastEarnedPoints:p,updatedAt:_serverTimestamp()},{merge:true});}catch(e){console.log('loyalty percent skipped',e)}};
+  const oldPlace=window.placeOrder; if(oldPlace){window.placeOrder=async function(){const before=Date.now(); const r=await oldPlace.apply(this,arguments); try{const hist=JSON.parse(localStorage.getItem('kaliaff_orders')||'[]'); const last=hist[hist.length-1]||{}; if(last&&last.phone){await window.kfAddLoyaltyPoints({name:last.name||document.getElementById('cName')?.value,phone:last.phone||document.getElementById('cPhone')?.value,email:document.getElementById('cEmail')?.value,subtotal:last.total||0,total:last.total||0});}}catch(e){} return r;}}
+  const oldLoad=window.loadMyLoyalty; window.loadMyLoyalty=async function(){ if(oldLoad) await oldLoad(); setTimeout(()=>{const info=document.getElementById('loyaltyInfo')||document.getElementById('loyaltyInfoFinal'); if(info&&!document.getElementById('kfLoyaltyNote')){const cfg=getCfg(); const n=document.createElement('div');n.id='kfLoyaltyNote';n.className='kf-loyalty-note';n.innerHTML=`প্রতি অর্ডারে <b>${cfg.percent}%</b> loyalty point যোগ হবে। ১০০০ টাকার food কিনলে ${Math.floor(1000*cfg.percent/100)} point পাবেন। ১ point = ৳${cfg.value} food value।`;info.parentNode.appendChild(n);}},200)};
+})();
+</script>
+
 </body>
 </html>
 
@@ -3296,7 +3344,99 @@ setTimeout(loadV6Tracking,1800);
   window.kaliaffApplySeo=function(){try{const s=window.settings||{}; if(s.seoTitle)document.title=s.seoTitle; function meta(n,v,prop){if(!v)return; let m=document.querySelector(prop?'meta[property="'+n+'"]':'meta[name="'+n+'"]'); if(!m){m=document.createElement('meta'); if(prop)m.setAttribute('property',n); else m.setAttribute('name',n); document.head.appendChild(m);} m.setAttribute('content',v);} meta('description',s.seoDescription); meta('keywords',s.seoKeywords); meta('og:title',s.seoTitle||document.title,true); meta('og:description',s.seoDescription,true); meta('og:image',s.logoUrl||'',true);}catch(e){}}; setTimeout(window.kaliaffApplySeo,2200);
 
   // 14) invoice/print for latest local order card
-  window.printKaliaffInvoice=function(orderId){const orders=(()=>{try{return JSON.parse(localStorage.getItem('kaliaff_last_order_data')||'{}')}catch(e){return {}}})(); const html=`<html><head><title>Invoice ${esc(orderId||orders.orderId||'')}</title><style>body{font-family:Arial;padding:24px}h2{color:#c0392b}.box{border:1px solid #ddd;padding:14px;border-radius:10px}table{width:100%;border-collapse:collapse}td,th{border-bottom:1px solid #eee;padding:8px;text-align:left}</style></head><body><h2>Kaliaff Invoice</h2><div class="box"><b>Order:</b> ${esc(orderId||orders.orderId||'Latest')}<br><b>Name:</b> ${esc(orders.name||'')}<br><b>Phone:</b> ${esc(orders.phone||'')}<br><b>Total:</b> ৳${esc(orders.total||'')}</div><p>Thank you for ordering from Kaliaff.</p><script>print()<\/script></body></html>`; const w=window.open('','_blank'); if(w){w.document.write(html); w.document.close();}};
+  window.printKaliaffInvoice=function(orderId){const orders=(()=>{try{return JSON.parse(localStorage.getItem('kaliaff_last_order_data')||'{}')}catch(e){return {}}})(); const html=`<html><head><title>Invoice ${esc(orderId||orders.orderId||'')}</title><style>body{font-family:Arial;padding:24px}h2{color:#c0392b}.box{border:1px solid #ddd;padding:14px;border-radius:10px}table{width:100%;border-collapse:collapse}td,th{border-bottom:1px solid #eee;padding:8px;text-align:left}</style></head><body><h2>Kaliaff Invoice</h2><div class="box"><b>Order:</b> ${esc(orderId||orders.orderId||'Latest')}<br><b>Name:</b> ${esc(orders.name||'')}<br><b>Phone:</b> ${esc(orders.phone||'')}<br><b>Total:</b> ৳${esc(orders.total||'')}</div><p>Thank you for ordering from Kaliaff.</p><script>print()<\/script>
+<!-- ===== CUSTOM REQUEST PATCH 2026-05-05 ===== -->
+<style>
+.kf-app-popup-bg{position:fixed;inset:0;z-index:130000;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;padding:18px;backdrop-filter:blur(8px)}
+.kf-app-popup-bg.show{display:flex}.kf-app-popup{background:white;border-radius:24px;width:min(360px,94vw);padding:24px 18px;text-align:center;box-shadow:0 24px 70px rgba(0,0,0,.35);font-family:'Hind Siliguri',sans-serif}.kf-app-popup h3{color:#c0392b;margin-bottom:8px}.kf-app-actions{display:flex;gap:10px;margin-top:16px}.kf-app-actions a,.kf-app-actions button{flex:1;border:none;border-radius:16px;padding:11px 10px;font-family:inherit;font-weight:800;text-decoration:none;cursor:pointer}.kf-app-actions a{background:#c0392b;color:#fff}.kf-app-actions button{background:#eee;color:#3d1f0d}
+.kf-delivery-help{font-weight:900;color:#c0392b;background:#fff3cd;border:1px solid #f39c12;border-radius:10px;padding:9px 11px;margin:5px 0 10px;font-size:.9rem;line-height:1.55}
+footer .footer-grid{grid-template-columns:1.4fr 1fr 1fr!important}.kf-footer-details{font-size:.84rem;line-height:1.75;color:#ddd}.kf-footer-details b{color:#f39c12}.kf-loyalty-note{background:#fff8e8;border:2px dashed #f39c12;border-radius:12px;padding:10px;margin:10px 0;color:#3d1f0d;font-size:.85rem}
+.banner-slide.image-only .banner-shop-now-floating{display:inline-flex!important;position:absolute;left:50%;bottom:18px;transform:translateX(-50%);z-index:4;background:#25D366;color:#fff;border:none;border-radius:24px;padding:10px 22px;font-weight:900;text-decoration:none;box-shadow:0 10px 25px rgba(0,0,0,.28)}
+body:not(.home-route-active) .live-chat-btn,body:not(.home-route-active) .chat-window{display:none!important}
+</style>
+<div class="kf-app-popup-bg" id="kfAppPopup"><div class="kf-app-popup"><h3>📱 App Download করুন</h3><p>ভালো experience এর জন্য Kaliaff app download করুন।</p><div class="kf-app-actions"><a id="kfAppDownloadBtn" href="#" target="_blank" onclick="localStorage.setItem('kaliaff_app_downloaded','yes')">Download</a><button onclick="document.getElementById('kfAppPopup').classList.remove('show')">Cancel</button></div></div></div>
+<script>
+(function(){
+  function num(v,d){v=parseFloat(v);return isNaN(v)?d:v}
+  function getCfg(){return {percent:num((window.settings||{}).loyaltyPointPercent,10), value:num((window.settings||{}).loyaltyPointValue,1)}}
+  function esc(s){return String(s||'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]))}
+  const oldApply=window.applySettings;
+  window.applySettings=function(){ if(oldApply) oldApply();
+    try{
+      document.body.classList.add('home-route-active');
+      const s=window.settings||{};
+      const fb=document.getElementById('footerLogo'); if(fb) fb.textContent=s.siteName||'Kaliaff';
+      const footer=document.querySelector('footer .footer-grid');
+      if(footer&&!document.getElementById('kfFooterCustom')) footer.innerHTML=`<div class="footer-brand"><div class="logo-text" id="footerLogo">${esc(s.siteName||'Kaliaff')}</div><div class="kf-footer-details"><b>${esc(s.siteName||'Kaliaff')}</b><br>${esc(s.address||'')}<br>📞 ${esc(s.phone||s.waNumber||'')}<br>✉️ ${esc(s.email||'')}</div></div><div><div class="footer-h">Social Media</div><div class="social-links"><a class="social-link" href="${esc(s.fbLink||'#')}" target="_blank">f</a><a class="social-link" href="https://wa.me/${String(s.waNumber||s.phone||'').replace(/[^0-9]/g,'')}" target="_blank">💬</a><a class="social-link" href="mailto:${esc(s.email||'')}">✉️</a></div></div><div id="kfFooterCustom"><div class="footer-h">Details</div><a class="footer-link" href="#home" onclick="bottomNav&&bottomNav('home')">Home</a><a class="footer-link" href="#me" onclick="bottomNav&&bottomNav('me')">Profile</a><a class="footer-link" href="#orders" onclick="bottomNav&&bottomNav('history')">Order History</a></div>`;
+      if(s.appDownloadLink && localStorage.getItem('kaliaff_app_downloaded')!=='yes'){ const a=document.getElementById('kfAppDownloadBtn'); if(a)a.href=s.appDownloadLink; setTimeout(()=>document.getElementById('kfAppPopup')?.classList.add('show'),900); }
+    }catch(e){}
+  };
+  const oldRenderBanner=window.renderBanners;
+  window.renderBanners=function(){
+    const s=window.settings||{}; if(s.bannerActive===false||s.bannerActive==='false'){document.getElementById('bannerSection')?.classList.remove('has-banners');return;}
+    const slider=document.getElementById('bannerSlider'), dots=document.getElementById('bannerDots'), section=document.getElementById('bannerSection');
+    const banners=(window.allBanners||[]).filter(b=>b&&b.image);
+    if(!slider||!section||!banners.length){ if(oldRenderBanner) oldRenderBanner(); return; }
+    section.classList.add('has-banners'); slider.innerHTML=banners.map((b,i)=>`<div class="banner-slide image-only has-image ${i===0?'active':''}"><img class="banner-img" src="${esc(b.image)}" alt="Banner"><a class="banner-shop-now-floating" href="${esc(b.foodUrl||b.link||'#')}" ${b.foodUrl||b.link?'target="_blank"':''}>Shop Now</a></div>`).join('');
+    if(dots)dots.innerHTML=banners.map((_,i)=>`<button class="banner-dot ${i===0?'active':''}" onclick="showBanner(${i})"></button>`).join('');
+  };
+  const oldBottom=window.bottomNav; if(oldBottom){window.bottomNav=function(name){oldBottom(name);document.body.classList.toggle('home-route-active',name==='home'); if(name!=='home')document.querySelector('.chat-window')?.classList.remove('open');};}
+  const oldOpenFood=window.openFoodDetail; if(oldOpenFood){window.openFoodDetail=function(){document.body.classList.remove('home-route-active');document.querySelector('.chat-window')?.classList.remove('open');return oldOpenFood.apply(this,arguments)}}
+  const oldClose=window.closeFoodDetail; if(oldClose){window.closeFoodDetail=function(){document.body.classList.add('home-route-active');return oldClose.apply(this,arguments)}}
+  function updateTransportHelp(){const el=document.getElementById('cTransport'); if(el&&!document.getElementById('kfDeliveryHelp')){const d=document.createElement('div');d.id='kfDeliveryHelp';d.className='kf-delivery-help';d.textContent='যাওয়া-আসার ভাড়ার সাথে ২০ টাকা বেশি যোগ হবে।';el.parentNode.insertBefore(d,el.nextSibling);}}
+  const oldOpenCheckout=window.openCheckout; if(oldOpenCheckout){window.openCheckout=function(){oldOpenCheckout.apply(this,arguments);setTimeout(updateTransportHelp,50)}}
+  const oldChat=window.addBotMessage||window.addChatMessage; document.addEventListener('DOMContentLoaded',()=>{setTimeout(()=>{document.querySelectorAll('.chat-msg.bot').forEach(x=>{if(/নমস্কার|nomoskar|namaskar/i.test(x.textContent))x.textContent='Kaliaff এ স্বাগতম';});},1500)});
+  window.kfAddLoyaltyPoints=async function(orderData){try{const cfg=getCfg(), p=Math.floor(num(orderData.subtotal||orderData.total,0)*cfg.percent/100); if(!p||!orderData.phone)return; const key=String(orderData.phone).replace(/[^0-9]/g,''); const ref=_doc(_db,'customers',key); const snap=await _getDoc(ref); const old=snap.exists()?snap.data():{}; await _setDoc(ref,{name:orderData.name||old.name||'',phone:orderData.phone,email:orderData.email||old.email||'',points:num(old.points,0)+p,loyaltyPercent:cfg.percent,pointValue:cfg.value,lastEarnedPoints:p,updatedAt:_serverTimestamp()},{merge:true});}catch(e){console.log('loyalty percent skipped',e)}};
+  const oldPlace=window.placeOrder; if(oldPlace){window.placeOrder=async function(){const before=Date.now(); const r=await oldPlace.apply(this,arguments); try{const hist=JSON.parse(localStorage.getItem('kaliaff_orders')||'[]'); const last=hist[hist.length-1]||{}; if(last&&last.phone){await window.kfAddLoyaltyPoints({name:last.name||document.getElementById('cName')?.value,phone:last.phone||document.getElementById('cPhone')?.value,email:document.getElementById('cEmail')?.value,subtotal:last.total||0,total:last.total||0});}}catch(e){} return r;}}
+  const oldLoad=window.loadMyLoyalty; window.loadMyLoyalty=async function(){ if(oldLoad) await oldLoad(); setTimeout(()=>{const info=document.getElementById('loyaltyInfo')||document.getElementById('loyaltyInfoFinal'); if(info&&!document.getElementById('kfLoyaltyNote')){const cfg=getCfg(); const n=document.createElement('div');n.id='kfLoyaltyNote';n.className='kf-loyalty-note';n.innerHTML=`প্রতি অর্ডারে <b>${cfg.percent}%</b> loyalty point যোগ হবে। ১০০০ টাকার food কিনলে ${Math.floor(1000*cfg.percent/100)} point পাবেন। ১ point = ৳${cfg.value} food value।`;info.parentNode.appendChild(n);}},200)};
+})();
+</script>
+
+
+
+<!-- ===== FOLLOWUP USER PATCH 2026-05-05: category grid + product order + whatsapp link ===== -->
+<style>
+/* Category filter এখন home grid-এর মতোই দেখাবে: phone এ ২টা card, horizontal slide নয় */
+.food-grid.category-slide-mode{display:grid!important;overflow:visible!important;scroll-snap-type:none!important;grid-template-columns:repeat(auto-fill,minmax(220px,1fr))!important;gap:18px!important;padding-bottom:0!important;}
+.food-grid.category-slide-mode .food-card{flex:unset!important;min-width:0!important;width:auto!important;scroll-snap-align:none!important;}
+@media(max-width:520px){.food-grid.category-slide-mode{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:12px!important;padding:0 12px!important}.food-grid.category-slide-mode .food-card{min-width:0!important}.kaliaff-category-sub{display:none!important}}
+@media(max-width:360px){.food-grid.category-slide-mode{grid-template-columns:1fr!important}}
+</style>
+<script id="kfFollowupUserPatch">
+(function(){
+  function ready(fn){ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',fn); else fn(); }
+  function sortFoods(list){ return (list||[]).sort(function(a,b){
+    const ao=Number.isFinite(parseInt(a.sortOrder,10))?parseInt(a.sortOrder,10):999999;
+    const bo=Number.isFinite(parseInt(b.sortOrder,10))?parseInt(b.sortOrder,10):999999;
+    if(ao!==bo) return ao-bo;
+    const ap=(parseInt(a.buyCount)||0)*8+(parseInt(a.searchCount)||0)*4;
+    const bp=(parseInt(b.buyCount)||0)*8+(parseInt(b.searchCount)||0)*4;
+    if(ap!==bp) return bp-ap;
+    const ac=a.createdAt?.seconds||a.createdAt||0, bc=b.createdAt?.seconds||b.createdAt||0;
+    return (bc||0)-(ac||0);
+  });}
+  window.kfSortFoods=sortFoods;
+  window.popularSort=function(a,b){ return sortFoods([a,b])[0]===a?-1:1; };
+  ready(function(){
+    const oldLoad=window.loadFoods;
+    if(oldLoad){ window.loadFoods=async function(){ await oldLoad.apply(this,arguments); try{ if(Array.isArray(window.allFoods)){ window.allFoods=sortFoods(window.allFoods); if(typeof renderFoods==='function') renderFoods(window.allFoods,true,false); } }catch(e){} }; }
+    const oldRender=window.renderFoods;
+    if(oldRender){ window.renderFoods=function(foods,makeTabs,slideMode){ const list=sortFoods([...(foods||[])]); return oldRender.call(this,list,makeTabs,slideMode); }; }
+    const oldFilter=window.filterCategoryIndex;
+    window.filterCategoryIndex=function(i){
+      const cat=(window._categoryList||['সব'])[i]||'সব';
+      document.querySelectorAll('.category-tab').forEach((b,idx)=>b.classList.toggle('active',idx===i));
+      const list=cat==='সব'?sortFoods([...(window.allFoods||[])]):sortFoods((window.allFoods||[]).filter(f=>f.category===cat));
+      window._activeCategoryName=cat;
+      if(typeof renderFoods==='function') renderFoods(list,false,cat!=='সব');
+      const sub=document.querySelector('.kaliaff-category-sub'); if(sub) sub.textContent='এই ক্যাটেগরির খাবারগুলো home page-এর মতো দেখানো হচ্ছে';
+    };
+    const oldApply=window.applySettings;
+    if(oldApply){ window.applySettings=function(){ oldApply.apply(this,arguments); try{ const s=window.settings||{}; const wa=s.whatsappLink||s.waLink||(s.waNumber||s.phone?('https://wa.me/'+String(s.waNumber||s.phone).replace(/[^0-9]/g,'')):'#'); document.querySelectorAll('a[href*="wa.me"], .wa-nav-btn').forEach(a=>{ if(wa&&wa!=='#') a.href=wa; }); }catch(e){} }; }
+  });
+})();
+</script>
+</body></html>`; const w=window.open('','_blank'); if(w){w.document.write(html); w.document.close();}};
   const oldPlace=window.placeOrder; window.placeOrder=async function(){ const oldCart=[...(window.cart||[])]; const before=Date.now(); await oldPlace.apply(this,arguments); try{const p={orderId:'KF'+String(before).slice(-8), name:q('cName')?.value, phone:q('cPhone')?.value, total:q('chkTotal')?.textContent?.replace(/[^0-9]/g,'')}; localStorage.setItem('kaliaff_last_order_data',JSON.stringify(p)); setTimeout(()=>{if(typeof showToast==='function')showToast('🧾 Invoice/print চাইলে History থেকে print করুন','success')},600);}catch(e){} };
 })();
 </script>
