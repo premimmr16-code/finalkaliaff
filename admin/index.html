@@ -448,6 +448,7 @@ select.form-input { appearance:auto; }
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
           <input class="form-input" id="catName" placeholder="নতুন ক্যাটেগরি নাম" style="flex:1;min-width:180px;">
           <button class="btn btn-primary" onclick="addCategory()">+ Add Category</button>
+          <button class="btn btn-success" onclick="ensureDefaultCategories().then(renderCategories)">✅ ডিফল্ট ২১ ক্যাটেগরি Sync</button>
         </div>
         <div id="categoryList"><div class="tbl-loading"><div class="spinner"></div></div></div>
       </div>
@@ -698,6 +699,13 @@ service firebase.storage {
         <input class="form-input food-url-input" id="fUrl6" placeholder="URL 6">
       </div>
       <div class="v6-mini-note">যদি কোনো item-এর জন্য ৩/৪/৬টা আলাদা link থাকে, এখানে দিন। User food details এ link button দেখবে।</div>
+    </div>
+
+    <div class="form-group v6-gradient-card" style="padding:12px;border-radius:10px;">
+      <label class="form-label">⚡ দ্রুত পণ্য যোগ (Bulk Paste)</label>
+      <textarea class="form-input" id="bulkFoodText" rows="4" placeholder="প্রতি লাইনে: নাম | ক্যাটেগরি | দাম | ছবি/লিংক | বিবরণ&#10;উদাহরণ: চিকেন বার্গার | বার্গার | 150 | https://...jpg | স্পেশাল"></textarea>
+      <div class="v6-mini-note">অনেক item একসাথে add করতে এখানে paste করে নিচের Bulk Save চাপুন। Link দিলে image হিসেবে save হবে, আর product URL-তেও থাকবে।</div>
+      <button type="button" class="btn btn-success" style="margin-top:8px" onclick="bulkAddFoodsFromText()">⚡ Bulk Save Products</button>
     </div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">মূল দাম (৳) *</label><input class="form-input" id="fPrice" type="number" placeholder="0"></div>
@@ -1792,21 +1800,70 @@ window.requireDeletePassword = function(actionLabel){
   return true;
 }
 
+
+// ===== KALIAFF DEFAULT CATEGORY ORDER =====
+const KALIAFF_DEFAULT_CATEGORIES = [
+  'বার্গার','পিজ্জা','স্যান্ডউইচ','শর্মা','মোমো','মিট বক্স','পাস্তা','চাওমিন','স্ন্যাকস','সুপ','ফুচকা','লাচ্ছি','মিল্কশেক','আইসক্রিম','ফালুদা','জুস','কোল্ড কফি','হট কফি','সেট মেনু','লাইভ চিকেন বিরিয়ানি','স্টুডেন্ট প্লেটার'
+];
+function kaliaffCatIndex(name){ const i=KALIAFF_DEFAULT_CATEGORIES.indexOf(String(name||'').trim()); return i<0?9999:i; }
+function kaliaffSortCategories(list){ return [...(list||[])].sort((a,b)=> kaliaffCatIndex(a.name||a)-kaliaffCatIndex(b.name||b) || String(a.name||a).localeCompare(String(b.name||b),'bn')); }
+async function ensureDefaultCategories(){
+  const names=new Set((allCategories||[]).map(c=>String(c.name||'').trim()));
+  let added=0;
+  for(let i=0;i<KALIAFF_DEFAULT_CATEGORIES.length;i++){
+    const name=KALIAFF_DEFAULT_CATEGORIES[i];
+    if(!names.has(name)){
+      try{ const ref=await _addDoc(_col(_db,'categories'),{name,serial:i+1,createdAt:_serverTimestamp(),updatedAt:_serverTimestamp()}); allCategories.push({_id:ref.id,name,serial:i+1}); names.add(name); added++; }catch(e){ console.warn('default category add failed', name, e); }
+    }
+  }
+  allCategories=kaliaffSortCategories(allCategories);
+  if(added) showToast('✅ ডিফল্ট '+added+'টি ক্যাটেগরি যোগ হয়েছে','success');
+}
+
 // ===== CATEGORIES & ADMIN CONTROLS =====
 async function loadCategories(){
-  try{ const snap=await _getDocs(_col(_db,'categories')); allCategories=[]; snap.forEach(d=>allCategories.push({_id:d.id,...d.data()})); renderCategories(); }
+  try{
+    const snap=await _getDocs(_col(_db,'categories'));
+    allCategories=[]; snap.forEach(d=>allCategories.push({_id:d.id,...d.data()}));
+    await ensureDefaultCategories();
+    allCategories=kaliaffSortCategories(allCategories);
+    renderCategories();
+  }
   catch(e){ const el=document.getElementById('categoryList'); if(el) el.innerHTML='<div class="empty-table">ক্যাটেগরি লোড সমস্যা</div>'; }
 }
 function renderCategories(){
   const el=document.getElementById('categoryList'); if(!el) return;
+  allCategories=kaliaffSortCategories(allCategories);
   if(!allCategories.length){ el.innerHTML='<div class="empty-table">কোনো ক্যাটেগরি নেই</div>'; return; }
-  el.innerHTML=allCategories.map(c=>`<div class="notice-item-card"><div class="notice-text">📂 ${c.name}</div><button class="btn btn-sm btn-danger" onclick="deleteCategory('${c._id}')">ডিলিট</button></div>`).join('');
+  el.innerHTML=allCategories.map((c,idx)=>`<div class="notice-item-card"><div class="notice-text">📂 ${c.name}</div><button class="btn btn-sm btn-danger" onclick="deleteCategory('${c._id}')">ডিলিট</button></div>`).join('');
+  try{ syncCategoryDatalist(); }catch(e){}
 }
 window.addCategory=async function(){
   const name=v('catName').trim(); if(!name){ showToast('ক্যাটেগরি নাম দিন'); return; }
-  try{ const ref=await _addDoc(_col(_db,'categories'),{name,createdAt:_serverTimestamp()}); allCategories.push({_id:ref.id,name}); document.getElementById('catName').value=''; renderCategories(); showToast('✅ ক্যাটেগরি যোগ হয়েছে','success'); }
+  if((allCategories||[]).some(c=>String(c.name||'').trim()===name)){ showToast('এই ক্যাটেগরি আগে থেকেই আছে'); return; }
+  try{ const serial=kaliaffCatIndex(name)<9999?kaliaffCatIndex(name)+1:(allCategories.length+1); const ref=await _addDoc(_col(_db,'categories'),{name,serial,createdAt:_serverTimestamp(),updatedAt:_serverTimestamp()}); allCategories.push({_id:ref.id,name,serial}); document.getElementById('catName').value=''; renderCategories(); showToast('✅ ক্যাটেগরি যোগ হয়েছে','success'); }
   catch(e){ showToast('❌ ক্যাটেগরি যোগ সমস্যা','error'); }
 }
+
+window.bulkAddFoodsFromText=async function(){
+  const box=document.getElementById('bulkFoodText'); const text=(box?.value||'').trim();
+  if(!text){ showToast('Bulk product data paste করুন'); return; }
+  if(!window._db || !window._addDoc){ showToast('Firebase ready হয়নি','error'); return; }
+  const rows=text.split(/\n+/).map(x=>x.trim()).filter(Boolean);
+  if(!confirm(rows.length+'টি product add করবেন?')) return;
+  let added=0, skipped=0;
+  for(const row of rows){
+    const p=row.split('|').map(x=>x.trim());
+    const name=p[0], category=(p[1]||'স্ন্যাকস').replace('চাউমিন','চাওমিন'), price=parseFloat(p[2]||'0'), link=p[3]||'', desc=p.slice(4).join(' | ');
+    if(!name || !price){ skipped++; continue; }
+    const isImg=/\.(png|jpe?g|webp|gif)(\?|$)/i.test(link) || /images|unsplash|pexels|cloudinary|firebasestorage/i.test(link);
+    await _addDoc(_col(_db,'foods'),{name,category,price,description:desc||'',image:isImg?link:'',images:isImg?[link]:[],productUrls:link?[link]:[],discount:0,tag:'',active:true,deleted:false,status:'active',createdAt:_serverTimestamp(),updatedAt:_serverTimestamp()});
+    added++;
+  }
+  box.value=''; showToast('✅ '+added+' product add হয়েছে'+(skipped?', '+skipped+' skip':'') ,'success');
+  if(typeof loadFoods==='function') await loadFoods();
+}
+
 window.deleteCategory=async function(id){ if(!confirm('ক্যাটেগরি ডিলিট করবেন?')) return; try{ await _deleteDoc(_doc(_db,'categories',id)); allCategories=allCategories.filter(c=>c._id!==id); renderCategories(); showToast('✅ ডিলিট হয়েছে','success'); }catch(e){showToast('❌ ডিলিট সমস্যা','error');} }
 window.clearCollectionData=async function(colName,label){ if(!confirm(label+' ডিলিট করবেন?')) return; if(!requireDeletePassword(label)) return; try{ const snap=await _getDocs(_col(_db,colName)); const jobs=[]; snap.forEach(d=>jobs.push(_deleteDoc(_doc(_db,colName,d.id)))); await Promise.all(jobs); showToast('✅ '+label+' ক্লিয়ার হয়েছে','success'); if(colName==='orders') loadOrders(); if(colName==='chats') loadChats(); if(colName==='payments') loadPayments(); }catch(e){ showToast('❌ Clear সমস্যা','error'); } }
 window.clearAllData=async function(){ if(!confirm('Orders, Chats, Payments সব ডিলিট করবেন?')) return; if(!requireDeletePassword('All data delete')) return; for(const c of ['orders','chats','payments']){ const snap=await _getDocs(_col(_db,c)); const jobs=[]; snap.forEach(d=>jobs.push(_deleteDoc(_doc(_db,c,d.id)))); await Promise.all(jobs); } showToast('✅ All data cleared','success'); loadOrders(); loadChats(); loadPayments(); }
@@ -2082,7 +2139,7 @@ setTimeout(()=>{try{syncCategoryDatalist();}catch(e){}},1500);
     item('স্টিম মোমো (৬ পিস)','মোমো',120,'momo'),item('চিজ স্টিম মোমো (৬ পিস)','মোমো',150,'momo'),item('ফ্রাই মোমো (৬ পিস)','মোমো',150,'momo'),item('ফ্রাই চিজ মোমো (৬ পিস)','মোমো',180,'momo'),item('কে এফ সি স্পেশাল মোমো (৬ পিস)','মোমো',199,'momo'),item('কে এফ সি স্পেশাল ফ্রাই মোমো (৬ পিস)','মোমো',230,'momo'),
     item('চিকেন মিট বক্স','মিট বক্স',180,'meatbox'),item('চিকেন চিজ মিট বক্স','মিট বক্স',220,'meatbox'),item('চিকেন চিজ ওভারলোডেড','মিট বক্স',250,'meatbox'),item('কে এফ সি স্পেশাল মিট বক্স','মিট বক্স',299,'meatbox'),
     item('রেড সস পাস্তা','পাস্তা',120,'pasta'),item('হোয়াইট সস পাস্তা','পাস্তা',150,'pasta'),item('বার-বি-কিউ পাস্তা','পাস্তা',150,'pasta'),item('নাগা পাস্তা','পাস্তা',170,'pasta'),item('মাশরুম পাস্তা','পাস্তা',190,'pasta'),item('ওভেন বেকড পাস্তা','পাস্তা',270,'pasta'),item('কে এফ সি স্পেশাল পাস্তা','পাস্তা',250,'pasta'),
-    item('চিকেন চাউমিন','চাউমিন',150,'chowmein'),item('এগ চাউমিন','চাউমিন',120,'chowmein'),item('ভেজিটেবল চাউমিন','চাউমিন',100,'chowmein'),item('মিক্সড চাউমিন','চাউমিন',170,'chowmein'),item('কোরিয়ান স্পাইসি চাউমিন','চাউমিন',220,'chowmein'),item('কে এফ সি স্পেশাল চাউমিন','চাউমিন',250,'chowmein'),
+    item('চিকেন চাউমিন','চাওমিন',150,'chowmein'),item('এগ চাউমিন','চাওমিন',120,'chowmein'),item('ভেজিটেবল চাউমিন','চাওমিন',100,'chowmein'),item('মিক্সড চাউমিন','চাওমিন',170,'chowmein'),item('কোরিয়ান স্পাইসি চাউমিন','চাওমিন',220,'chowmein'),item('কে এফ সি স্পেশাল চাউমিন','চাওমিন',250,'chowmein'),
     item('ক্রিস্পি চিকেন ফ্রাই','স্ন্যাকস',90,'snacks'),item('থাই চিকেন ফ্রাই','স্ন্যাকস',100,'snacks'),item('ফ্রেঞ্চ ফ্রাই','স্ন্যাকস',100,'snacks'),item('নাচোস','স্ন্যাকস',150,'snacks'),item('স্পেশাল নাচোস','স্ন্যাকস',200,'snacks'),item('ভেজিটেবল সালাদ','স্ন্যাকস',100,'snacks'),item('ক্যান্টন সালাদ','স্ন্যাকস',350,'snacks'),
     item('কর্ন সুপ','সুপ',120,'soup'),item('থাই সুপ','সুপ',150,'soup'),item('থাই ক্লিয়ার সুপ','সুপ',150,'soup'),item('অনথন (৬ পিস)','সুপ',150,'soup'),
     item('নাগা ফুচকা (৮ পিস)','ফুচকা',80,'fuchka'),item('দই ফুচকা (৮ পিস)','ফুচকা',150,'fuchka'),item('চিড়া দই','ফুচকা',100,'fuchka'),
@@ -2094,8 +2151,9 @@ setTimeout(()=>{try{syncCategoryDatalist();}catch(e){}},1500);
     item('চকোলেট কোল্ড কফি','কোল্ড কফি',120,'coffee'),item('ক্যারামেল কোল্ড কফি','কোল্ড কফি',120,'coffee'),item('ক্যারামেল চকোলেট কোল্ড কফি','কোল্ড কফি',130,'coffee'),item('ব্ল্যাক কফি','হট কফি',50,'coffee'),item('মিল্ক হট কফি','হট কফি',70,'coffee'),item('চকোলেট হট কফি','হট কফি',100,'coffee'),item('ক্যারামেল হট কফি','হট কফি',90,'coffee'),
     item('এগ বার্গার','বার্গার',100,'burger'),item('চিকেন ক্রিস্পি বার্গার','বার্গার',150,'burger'),item('কিং বার্গার','বার্গার',160,'burger'),item('গ্রিল সাব বার্গার','বার্গার',160,'burger'),item('চিকেন পেটি বার্গার','বার্গার',120,'burger'),item('বার-বি-কিউ বার্গার','বার্গার',170,'burger'),item('নাগা বার্গার','বার্গার',180,'burger'),item('মাশরুম বার্গার','বার্গার',199,'burger'),item('ডাবল চিজ বার্গার','বার্গার',220,'burger'),item('স্পেশাল বার্গার','বার্গার',250,'burger'),
     item('চিকেন পিজ্জা','পিজ্জা',350,'pizza',[{name:'৬ inch',price:350},{name:'৮ inch',price:550},{name:'১০ inch',price:700},{name:'১২ inch',price:999}]),item('চিকেন বার-বি-কিউ পিজ্জা','পিজ্জা',400,'pizza',[{name:'৬ inch',price:400},{name:'৮ inch',price:600},{name:'১০ inch',price:750},{name:'১২ inch',price:1100}]),item('চিকেন ওভারলোডেড পিজ্জা','পিজ্জা',450,'pizza',[{name:'৬ inch',price:450},{name:'৮ inch',price:700},{name:'১০ inch',price:850},{name:'১২ inch',price:1200}]),item('কালিয়া ফাস্ট ফুড স্পেশাল পিজ্জা','পিজ্জা',500,'pizza',[{name:'৬ inch',price:500},{name:'৮ inch',price:800},{name:'১০ inch',price:900},{name:'১২ inch',price:1300}]),
+    item('স্টুডেন্ট প্লেটার ১','স্টুডেন্ট প্লেটার',120,'setmenu',[], 'স্টুডেন্টদের জন্য বাজেট প্লেটার'),item('স্টুডেন্ট প্লেটার ২','স্টুডেন্ট প্লেটার',150,'setmenu',[], 'স্টুডেন্টদের জন্য স্পেশাল প্লেটার'),
     item('সেট মেনু ১','সেট মেনু',230,'setmenu',[], 'চিকেন ফ্রাই + রাইস + চাইনিজ ভেজিটেবল + সালাদ'),item('সেট মেনু ২','সেট মেনু',260,'setmenu',[], 'চিলি চিকেন + রাইস + চাইনিজ ভেজিটেবল + সালাদ'),item('সেট মেনু ৩','সেট মেনু',280,'setmenu',[], 'বার-বি-কিউ চিকেন + রাইস + চাইনিজ ভেজিটেবল + সালাদ'),item('সেট মেনু ৪','সেট মেনু',290,'setmenu',[], 'মাসালা চিকেন + রাইস + চাইনিজ ভেজিটেবল + সালাদ'),item('সেট মেনু ৫','সেট মেনু',350,'setmenu',[], 'চিকেন ফ্রাই + বার-বি-কিউ চিকেন + রাইস + চাইনিজ ভেজিটেবল + সালাদ'),
-    item('হায়দ্রাবাদি চিকেন বিরিয়ানি','অন্যান্য',199,'biryani',[], 'মিনিমাম ২ প্লেট অর্ডার করতে হবে'),item('ফুল চিকেন ফ্রাই (১ কেজি)','অন্যান্য',600,'snacks'),item('হট ডগ (চিকেন)','অন্যান্য',150,'hotdog')
+    item('হায়দ্রাবাদি চিকেন বিরিয়ানি','লাইভ চিকেন বিরিয়ানি',199,'biryani',[], 'মিনিমাম ২ প্লেট অর্ডার করতে হবে'),item('ফুল চিকেন ফ্রাই (১ কেজি)','অন্যান্য',600,'snacks'),item('হট ডগ (চিকেন)','অন্যান্য',150,'hotdog')
   ];
   window.kaliaffSeedFullMenu=async function(){
     if(!window._db || !window._col || !window._addDoc){ toast('Firebase ready হয়নি, একটু পরে চেষ্টা করুন','error'); return; }
@@ -2279,6 +2337,170 @@ setTimeout(()=>{try{syncCategoryDatalist();}catch(e){}},1500);
   ready(function(){ patchSettings(); patchFoods(); setTimeout(function(){ensureSettingsInputs(); ensureFoodOrderInput(); if(window.fillSettings) window.fillSettings(); if(window.renderFoods) window.renderFoods();},1000); });
 })();
 </script>
+
+
+<!-- ===== FINAL NO SERIAL CATEGORY + BULK PRODUCTS PATCH ===== -->
+<script id="finalNoSerialBulkProductsPatch">
+(function(){
+  const PROVIDED_BULK_PRODUCTS = [
+  {
+    "name": "স্টিম মোমো (ভেজ)",
+    "category": "মোমো",
+    "price": 120,
+    "image": "https://www.image2url.com/r2/default/images/1778028678709-84eed780-f7e3-4536-b17c-2bf4302539ad.jpeg",
+    "description": "নরম ও জুসি ভেজ স্টিম মোমো, টাটকা সবজি দিয়ে তৈরি। হালকা মসলা ও স্পেশাল সসের সাথে পরিবেশন করা হয়।"
+  },
+  {
+    "name": "চিজ স্টিম মোমো (ভেজ)",
+    "category": "মোমো",
+    "price": 150,
+    "image": "https://www.image2url.com/r2/default/images/1778028718508-c1f1ecfd-8b65-480e-bb57-85d4f96a0c1c.jpeg",
+    "description": "গলানো চিজে ভরা সুস্বাদু স্টিম মোমো। চিজ লাভারদের জন্য এটি একদম পারফেক্ট একটি আইটেম।"
+  },
+  {
+    "name": "ফ্রাই মোমো (ভেজ)",
+    "category": "মোমো",
+    "price": 150,
+    "image": "https://www.image2url.com/r2/default/images/1778028747472-210e23f8-a7ca-457e-8109-fdccaaaab8b0.jpeg",
+    "description": "ক্রিসপি ও গোল্ডেন ফ্রাই মোমো, বাইরের অংশ মচমচে আর ভেতরে নরম ফিলিং। ঝাল সসের সাথে খেতে আরও মজাদার।"
+  },
+  {
+    "name": "ফ্রাই চিজ মোমো (ভেজ)",
+    "category": "মোমো",
+    "price": 180,
+    "image": "https://www.image2url.com/r2/default/images/1778028769377-258fa322-8c63-451b-a314-927543455324.jpeg",
+    "description": "মচমচে ফ্রাই মোমোর ভেতরে রয়েছে গলানো চিজের দারুণ স্বাদ। প্রতিটি কামড়ে পাবেন ক্রাঞ্চ ও চিজের অসাধারণ কম্বিনেশন।"
+  },
+  {
+    "name": "কে এক এক স্পেশাল মোমো (ভেজ)",
+    "category": "মোমো",
+    "price": 199,
+    "image": "https://www.image2url.com/r2/default/images/1778028791738-5062edbf-9091-4d50-87fc-2b976c20cb9a.jpeg",
+    "description": "আমাদের স্পেশাল রেসিপিতে তৈরি ভেজ মোমো, স্বাদে একদম ইউনিক। বিশেষ মসলা ও সসের কারণে এটি সবার পছন্দের তালিকায় থাকে।"
+  },
+  {
+    "name": "কে এক এক স্পেশাল ফ্রাই মোমো (ভেজ)",
+    "category": "মোমো",
+    "price": 230,
+    "image": "https://www.image2url.com/r2/default/images/1778028820689-53f3eb98-f5ad-42cd-bba5-e9c45e91b22b.jpeg",
+    "description": "স্পেশাল ফ্রাই মোমো যা বাইরে ক্রিসপি ও ভেতরে রসালো ফিলিংয়ে ভরপুর। আড্ডা বা স্ন্যাকস হিসেবে একদম পারফেক্ট।"
+  },
+  {
+    "name": "চিকেন মিট বক্স",
+    "category": "মিট বক্স",
+    "price": 180,
+    "image": "https://www.image2url.com/r2/default/images/1778029115840-f16d5126-b5e1-4d9d-9e00-20ab9b1c5b02.jpeg",
+    "description": "নরম চিকেন ও ফ্রেশ সবজি দিয়ে তৈরি সুস্বাদু মিট বক্স। স্পেশাল সস ও টপিংসের কারণে প্রতিটি কামড়ে পাবেন ভিন্ন স্বাদ।"
+  },
+  {
+    "name": "চিকেন চিজ মিট বক্স",
+    "category": "মিট বক্স",
+    "price": 220,
+    "image": "https://www.image2url.com/r2/default/images/1778029160337-5c9b5d2e-31db-4e07-ac40-a79cff2a1a26.jpeg",
+    "description": "জুসি চিকেনের সাথে গলানো চিজের পারফেক্ট কম্বিনেশন। চিজ লাভারদের জন্য এটি একটি ক্রিমি ও মজাদার আইটেম।"
+  },
+  {
+    "name": "চিকেন চিজ ওভারলোডেড",
+    "category": "মিট বক্স",
+    "price": 250,
+    "image": "https://www.image2url.com/r2/default/images/1778029183133-edae1a65-a9fa-4ec1-ad90-67438cd630ec.jpeg",
+    "description": "অতিরিক্ত চিজ ও চিকেন দিয়ে তৈরি ওভারলোডেড মিট বক্স। প্রতিটি বাইটে পাবেন রিচ ফ্লেভার ও চিজি মজা।"
+  },
+  {
+    "name": "কে এক এক স্পেশাল মিটবক্স",
+    "category": "মিট বক্স",
+    "price": 299,
+    "image": "https://www.image2url.com/r2/default/images/1778029205949-47ca6566-2878-4a5a-aadb-f47a72746dc5.jpeg",
+    "description": "আমাদের নিজস্ব স্পেশাল রেসিপিতে তৈরি প্রিমিয়াম মিট বক্স। বিশেষ সস, টপিংস ও চিকেনের দারুণ মিশ্রণে এটি সবার পছন্দের একটি আইটেম।"
+  },
+  {
+    "name": "নাগা ফুচকা (৮ পিস)",
+    "category": "ফুচকা",
+    "price": 80,
+    "image": "https://www.image2url.com/r2/default/images/1778029576661-04189f2a-96b3-4896-a61c-768c8ecf4782.png",
+    "description": "ঝালপ্রেমীদের জন্য স্পেশাল নাগা ফুচকা, যেখানে রয়েছে নাগা মরিচের তীব্র স্বাদ। টক, ঝাল ও মচমচে ফুচকার অসাধারণ কম্বিনেশন আপনাকে দেবে ভিন্ন এক অভিজ্ঞতা।"
+  },
+  {
+    "name": "দই ফুচকা (৮ পিস)",
+    "category": "ফুচকা",
+    "price": 150,
+    "image": "https://www.image2url.com/r2/default/images/1778029595851-5b029992-8acd-4667-9551-97e10ac705c6.png",
+    "description": "ঠান্ডা দই, মশলাদার পুর ও মিষ্টি-টক সস দিয়ে তৈরি দই ফুচকা। প্রতিটি কামড়ে পাবেন ক্রিমি ও মজাদার স্বাদ যা সবাইকে মুগ্ধ করবে।"
+  }
+];
+  window.KALIAFF_PROVIDED_BULK_PRODUCTS = PROVIDED_BULK_PRODUCTS;
+  function cleanPrice(v){
+    const map={'০':'0','১':'1','২':'2','৩':'3','৪':'4','৫':'5','৬':'6','৭':'7','৮':'8','৯':'9'};
+    return parseFloat(String(v||'').replace(/[০-৯]/g,ch=>map[ch]||ch).replace(/[^0-9.]/g,''))||0;
+  }
+  function extractUrl(s){
+    s=String(s||'').trim();
+    const md=s.match(/\((https?:\/\/[^)]+)\)/); if(md) return md[1].trim();
+    const raw=s.match(/https?:\/\/\S+/); return raw?raw[0].replace(/[\])]+$/,''):'';
+  }
+  function isImageLink(link){ return /\.(png|jpe?g|webp|gif)(\?|$)/i.test(link)||/images|image2url|unsplash|pexels|cloudinary|firebasestorage|imgbb/i.test(link); }
+  function parseBulkRows(text){
+    return String(text||'').split(/
++/).map(x=>x.trim()).filter(Boolean).map(row=>{
+      if(/^\|?\s*-+/.test(row) || (/নাম/.test(row)&&/ক্যাটেগরি/.test(row))) return null;
+      let p=row.startsWith('|')?row.replace(/^\|/,'').replace(/\|$/,'').split('|'):row.split('|');
+      p=p.map(x=>x.trim()); if(p.length<3) return null;
+      const name=p[0], category=(p[1]||'স্ন্যাকস').replace('চাউমিন','চাওমিন'), price=cleanPrice(p[2]);
+      const link=extractUrl(p[3]||''), desc=p.slice(4).join(' | ');
+      if(!name || !price) return null;
+      return {name,category,price,description:desc||'',image:isImageLink(link)?link:'',images:isImageLink(link)?[link]:[],productUrls:link?[link]:[],discount:0,tag:'',active:true,deleted:false,status:'active'};
+    }).filter(Boolean);
+  }
+  window.bulkAddFoodsFromText = async function(){
+    const box=document.getElementById('bulkFoodText'); const text=(box&&box.value||'').trim();
+    if(!text){ showToast('Bulk product data paste করুন'); return; }
+    if(!window._db || !window._addDoc){ showToast('Firebase ready হয়নি','error'); return; }
+    const items=parseBulkRows(text);
+    if(!items.length){ showToast('সঠিক format পাওয়া যায়নি: নাম | ক্যাটেগরি | দাম | ছবি/লিংক | বিবরণ','error'); return; }
+    if(!confirm(items.length+'টি product add করবেন?')) return;
+    let added=0, skipped=0;
+    try{
+      const existing=new Set();
+      try{ const snap=await _getDocs(_col(_db,'foods')); snap.forEach(d=>existing.add(String((d.data()||{}).name||'').trim())); }catch(e){}
+      for(const it of items){
+        if(existing.has(String(it.name).trim())){ skipped++; continue; }
+        await _addDoc(_col(_db,'foods'), Object.assign({}, it, {createdAt:_serverTimestamp(),updatedAt:_serverTimestamp()}));
+        existing.add(String(it.name).trim()); added++;
+      }
+      box.value=''; showToast('✅ '+added+' product add হয়েছে'+(skipped?', '+skipped+' duplicate skip':''),'success');
+      if(typeof loadFoods==='function') await loadFoods(); if(typeof updateDashboard==='function') updateDashboard();
+    }catch(e){ console.error(e); showToast('❌ Bulk add সমস্যা: '+(e.message||e.code||'Firebase error'),'error'); }
+  };
+  window.kaliaffSeedProvidedBulkProducts = async function(){
+    if(!window._db || !window._addDoc){ showToast('Firebase ready হয়নি','error'); return; }
+    if(!confirm(PROVIDED_BULK_PRODUCTS.length+'টি provided bulk product auto add করবেন? Duplicate হলে skip হবে।')) return;
+    let added=0, skipped=0;
+    try{
+      const existing=new Set();
+      try{ const snap=await _getDocs(_col(_db,'foods')); snap.forEach(d=>existing.add(String((d.data()||{}).name||'').trim())); }catch(e){}
+      for(const p of PROVIDED_BULK_PRODUCTS){
+        if(existing.has(String(p.name).trim())){ skipped++; continue; }
+        const link=p.image||'';
+        await _addDoc(_col(_db,'foods'), {name:p.name,category:p.category,price:p.price,description:p.description||'',image:link,images:link?[link]:[],productUrls:link?[link]:[],discount:0,tag:'',active:true,deleted:false,status:'active',createdAt:_serverTimestamp(),updatedAt:_serverTimestamp()});
+        existing.add(String(p.name).trim()); added++;
+      }
+      showToast('✅ '+added+' provided product add হয়েছে'+(skipped?', '+skipped+' duplicate skip':''),'success');
+      if(typeof loadFoods==='function') await loadFoods(); if(typeof updateDashboard==='function') updateDashboard();
+    }catch(e){ console.error(e); showToast('❌ Provided product add সমস্যা: '+(e.message||e.code||'Firebase error'),'error'); }
+  };
+  function addProvidedButton(){
+    const head=document.querySelector('#secFoods .table-head') || document.querySelector('.table-head');
+    if(head && !document.getElementById('seedProvidedBulkBtn')){
+      const btn=document.createElement('button'); btn.id='seedProvidedBulkBtn'; btn.className='btn btn-success'; btn.textContent='⚡ Provided Bulk Products Add'; btn.onclick=window.kaliaffSeedProvidedBulkProducts; head.appendChild(btn);
+    }
+    const box=document.getElementById('bulkFoodText');
+    if(box && !box.dataset.finalPlaceholder){ box.dataset.finalPlaceholder='1'; box.placeholder='প্রতি লাইনে: নাম | ক্যাটেগরি | দাম | ছবি/লিংক | বিবরণ\nMarkdown table paste করলেও কাজ করবে।'; }
+  }
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(addProvidedButton,600)); setTimeout(addProvidedButton,1500); setTimeout(addProvidedButton,3500);
+  const oldShow=window.showSection; if(typeof oldShow==='function') window.showSection=function(){ const r=oldShow.apply(this,arguments); setTimeout(addProvidedButton,100); return r; };
+})();
+</script>
+
 </body>
 </html>
 
