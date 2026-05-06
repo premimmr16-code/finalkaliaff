@@ -1595,6 +1595,12 @@ window.initApp();
 
 <script>
 let cart = JSON.parse(localStorage.getItem('kaliaff_cart') || '[]');
+
+const KALIAFF_DEFAULT_CATEGORIES = ['বার্গার','পিজ্জা','স্যান্ডউইচ','শর্মা','মোমো','মিট বক্স','পাস্তা','চাওমিন','স্ন্যাকস','সুপ','ফুচকা','লাচ্ছি','মিল্কশেক','আইসক্রিম','ফালুদা','জুস','কোল্ড কফি','হট কফি','সেট মেনু','লাইভ চিকেন বিরিয়ানি','স্টুডেন্ট প্লেটার'];
+function kaliaffCatIndex(name){ const i=KALIAFF_DEFAULT_CATEGORIES.indexOf(String(name||'').trim()); return i<0?9999:i; }
+function kaliaffSortCategoryNames(list){ const seen=new Set(); return [...(list||[])].map(x=>String(x||'').trim().replace('চাউমিন','চাওমিন')).filter(x=>{ if(!x||seen.has(x)) return false; seen.add(x); return true;}).sort((a,b)=>kaliaffCatIndex(a)-kaliaffCatIndex(b)||a.localeCompare(b,'bn')); }
+function kaliaffSameCategory(a,b){ return String(a||'').trim().replace('চাউমিন','চাওমিন')===String(b||'').trim().replace('চাউমিন','চাওমিন'); }
+
 let allFoods = [];
 let settings = {};
 let currentFood = null;
@@ -1915,14 +1921,15 @@ async function loadFoods() {
 
 function renderCategoryTabs(foods){
   const tabs=document.getElementById('categoryTabs'); if(!tabs) return;
-  const cats=['সব', ...Array.from(new Set(foods.map(f=>f.category).filter(Boolean)))];
+  const foodCats=Array.from(new Set((foods||[]).map(f=>f.category).filter(Boolean)));
+  const cats=['সব', ...kaliaffSortCategoryNames([...KALIAFF_DEFAULT_CATEGORIES, ...foodCats])];
   window._categoryList=cats;
   tabs.innerHTML=cats.map((c,i)=>`<button class="category-tab ${i===0?'active':''}" onclick="filterCategoryIndex(${i})">${c}</button>`).join('');
 }
 window.filterCategoryIndex=function(i){
   const cat=(window._categoryList||['সব'])[i]||'সব';
   document.querySelectorAll('.category-tab').forEach((b,idx)=>b.classList.toggle('active',idx===i));
-  const list=cat==='সব'?allFoods:allFoods.filter(f=>f.category===cat);
+  const list=cat==='সব'?allFoods:allFoods.filter(f=>kaliaffSameCategory(f.category,cat));
   window._activeCategoryName = cat;
   renderFoods(list,false,cat!=='সব');
 }
@@ -3212,6 +3219,28 @@ body:not(.home-route-active) .live-chat-btn,body:not(.home-route-active) .chat-w
 })();
 </script>
 
+
+
+<!-- ===== FINAL CATEGORY NAME ONLY PATCH ===== -->
+<script id="finalCategoryNameOnlyPatch">
+(function(){
+  function stripCategorySerial(){
+    document.querySelectorAll('.category-tab').forEach(function(btn){
+      btn.textContent = String(btn.textContent||'').replace(/^\s*[০-৯0-9]+[.)।]?\s*/, '');
+    });
+  }
+  document.addEventListener('DOMContentLoaded', function(){ setTimeout(stripCategorySerial,300); setTimeout(stripCategorySerial,1200); });
+  const oldRender = window.renderCategoryTabs;
+  if(typeof oldRender === 'function'){
+    window.renderCategoryTabs = function(){ const r=oldRender.apply(this,arguments); setTimeout(stripCategorySerial,0); return r; };
+  }
+  const oldFilter = window.filterCategoryIndex;
+  if(typeof oldFilter === 'function'){
+    window.filterCategoryIndex = function(){ const r=oldFilter.apply(this,arguments); setTimeout(stripCategorySerial,0); return r; };
+  }
+})();
+</script>
+
 </body>
 </html>
 
@@ -3426,7 +3455,7 @@ body:not(.home-route-active) .live-chat-btn,body:not(.home-route-active) .chat-w
     window.filterCategoryIndex=function(i){
       const cat=(window._categoryList||['সব'])[i]||'সব';
       document.querySelectorAll('.category-tab').forEach((b,idx)=>b.classList.toggle('active',idx===i));
-      const list=cat==='সব'?sortFoods([...(window.allFoods||[])]):sortFoods((window.allFoods||[]).filter(f=>f.category===cat));
+      const list=cat==='সব'?sortFoods([...(window.allFoods||[])]):sortFoods((window.allFoods||[]).filter(f=>kaliaffSameCategory(f.category,cat)));
       window._activeCategoryName=cat;
       if(typeof renderFoods==='function') renderFoods(list,false,cat!=='সব');
       const sub=document.querySelector('.kaliaff-category-sub'); if(sub) sub.textContent='এই ক্যাটেগরির খাবারগুলো home page-এর মতো দেখানো হচ্ছে';
@@ -3436,6 +3465,28 @@ body:not(.home-route-active) .live-chat-btn,body:not(.home-route-active) .chat-w
   });
 })();
 </script>
+
+
+<!-- ===== FINAL CATEGORY NAME ONLY PATCH ===== -->
+<script id="finalCategoryNameOnlyPatch">
+(function(){
+  function stripCategorySerial(){
+    document.querySelectorAll('.category-tab').forEach(function(btn){
+      btn.textContent = String(btn.textContent||'').replace(/^\s*[০-৯0-9]+[.)।]?\s*/, '');
+    });
+  }
+  document.addEventListener('DOMContentLoaded', function(){ setTimeout(stripCategorySerial,300); setTimeout(stripCategorySerial,1200); });
+  const oldRender = window.renderCategoryTabs;
+  if(typeof oldRender === 'function'){
+    window.renderCategoryTabs = function(){ const r=oldRender.apply(this,arguments); setTimeout(stripCategorySerial,0); return r; };
+  }
+  const oldFilter = window.filterCategoryIndex;
+  if(typeof oldFilter === 'function'){
+    window.filterCategoryIndex = function(){ const r=oldFilter.apply(this,arguments); setTimeout(stripCategorySerial,0); return r; };
+  }
+})();
+</script>
+
 </body></html>`; const w=window.open('','_blank'); if(w){w.document.write(html); w.document.close();}};
   const oldPlace=window.placeOrder; window.placeOrder=async function(){ const oldCart=[...(window.cart||[])]; const before=Date.now(); await oldPlace.apply(this,arguments); try{const p={orderId:'KF'+String(before).slice(-8), name:q('cName')?.value, phone:q('cPhone')?.value, total:q('chkTotal')?.textContent?.replace(/[^0-9]/g,'')}; localStorage.setItem('kaliaff_last_order_data',JSON.stringify(p)); setTimeout(()=>{if(typeof showToast==='function')showToast('🧾 Invoice/print চাইলে History থেকে print করুন','success')},600);}catch(e){} };
 })();
