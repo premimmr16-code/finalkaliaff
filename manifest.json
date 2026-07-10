@@ -1,11 +1,17 @@
 {
   "name": "Kalia Fastfood",
   "short_name": "Kalia",
+  "id": "/",
   "start_url": "index.html",
+  "scope": "./",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#fff8f0",
   "theme_color": "#c0392b",
-  "description": "Kalia Fastfood Satpar Bazar, Gopalganj",
+  "description": "Kalia Fastfood Satpar Bazar, Gopalganj - burger, pizza, fast food and online food delivery.",
+  "lang": "bn-BD",
+  "dir": "ltr",
+  "categories": ["food", "shopping", "business"],
   "icons": [
     {
       "src": "kaliaff.jpg",
